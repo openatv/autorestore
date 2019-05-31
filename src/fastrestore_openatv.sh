@@ -180,9 +180,6 @@ restore_plugins() {
 		fi
 	done
 	echo >>$LOG
-	echo "Installing plugins from feeds ..." >> $LOG
-	opkg install $pkgs >>$LOG 2>>$LOG
-	echo >>$LOG
 	echo "Installing plugins from local media ..." >> $LOG
 	for i in hdd usb backup; do
 		if ls /media/${i}/images/ipk/*.ipk >/dev/null 2>/dev/null; then
@@ -191,6 +188,9 @@ restore_plugins() {
 			opkg install /media/${i}/images/ipk/*.ipk >>$LOG 2>>$LOG
 		fi
 	done
+	echo >>$LOG
+	echo "Installing plugins from feeds ..." >> $LOG
+	opkg install $pkgs >>$LOG 2>>$LOG
 	echo >>$LOG
 }
 
