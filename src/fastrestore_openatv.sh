@@ -168,8 +168,19 @@ restore_plugins() {
 	echo "Updating feeds ..." >> $LOG
 	opkg update >>$LOG 2>>$LOG
 	echo >>$LOG
+	echo "Installing feeds from feeds ..." >> $LOG
+	allpkgs=$(<${ROOTFS}tmp/installed-list.txt)
+	pkgs=""
+	for pkg in $allpkgs; do
+		if echo $pkg | grep -q "\-feed\-"; then
+			opkg install $pkg >>$LOG 2>>$LOG || true
+			opkg update >>$LOG 2>>$LOG || true
+		else
+			pkgs="$pkgs $pkg"
+		fi
+	done
+	echo >>$LOG
 	echo "Installing plugins from feeds ..." >> $LOG
-	pkgs=$(<${ROOTFS}tmp/installed-list.txt)
 	opkg install $pkgs >>$LOG 2>>$LOG
 	echo >>$LOG
 	echo "Installing plugins from local media ..." >> $LOG
