@@ -20,7 +20,7 @@ get_restoremode() {
 	fast=0
 	turbo=1
 
-	for i in hdd usb backup; do
+	for i in hdd mmc usb backup; do
 		[ -e /media/${i}/images/config/settings ] && settings=1
 		[ -e /media/${i}/images/config/noplugins ] && noplugins=1
 		[ -e /media/${i}/images/config/plugins ] && plugins=1
@@ -181,7 +181,7 @@ restore_plugins() {
 	done
 	echo >>$LOG
 	echo "Installing plugins from local media ..." >> $LOG
-	for i in hdd usb backup; do
+	for i in hdd mmc usb backup; do
 		if ls /media/${i}/images/ipk/*.ipk >/dev/null 2>/dev/null; then
 			echo >>$LOG
 			echo "${i}:" >>$LOG
@@ -263,7 +263,7 @@ if [ $plugins -eq 1 ] && [ -e ${ROOTFS}tmp/installed-list.txt ]; then
 	echo >>$LOG
 fi
 
-for i in hdd usb backup; do
+for i in hdd mmc usb backup; do
 	# Execute MyRestore ...
 	if [ -e /media/${i}/images/config/myrestore.sh ]; then
 		echo >>$LOG
