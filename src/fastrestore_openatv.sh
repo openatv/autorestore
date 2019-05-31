@@ -151,12 +151,18 @@ restore_settings() {
 
 restart_network() {
 	echo >>$LOG
-	echo "Restarting network" >>$LOG
+	echo "Restarting network ..." >>$LOG
 	echo >>$LOG
 	[ -e "${ROOTFS}etc/init.d/hostname.sh" ] && ${ROOTFS}etc/init.d/hostname.sh
 	[ -e "${ROOTFS}etc/init.d/networking" ] && ${ROOTFS}etc/init.d/networking restart >>$LOG
-	# TODO: Find a better method to wait for network without blocking
-	sleep 10
+	x=0
+	while [ $x -lt 15 ]; do
+	        ping -c 1 www.google.com >/dev/null 2>&1 && break
+		ping6 -c 1 www.google.com >/dev/null 2>&1 && break
+	        x=$((x+1))
+	done
+	echo "Waited $x seconds for network reconnect."
+	sleep 1
 	echo >>$LOG
 }
 
