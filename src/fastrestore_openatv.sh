@@ -161,7 +161,7 @@ restart_network() {
 		ping6 -c 1 www.google.com >/dev/null 2>&1 && break
 	        x=$((x+1))
 	done
-	echo "Waited $x seconds for network reconnect."
+	echo "Waited $x seconds for network reconnect." >>$LOG 2>>$LOG
 	sleep 1
 	echo >>$LOG
 }
