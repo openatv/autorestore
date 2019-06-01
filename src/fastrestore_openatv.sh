@@ -155,6 +155,7 @@ restart_network() {
 	echo >>$LOG
 	[ -e "${ROOTFS}etc/init.d/hostname.sh" ] && ${ROOTFS}etc/init.d/hostname.sh
 	[ -e "${ROOTFS}etc/init.d/networking" ] && ${ROOTFS}etc/init.d/networking restart >>$LOG
+	sleep 3
 	x=0
 	while [ $x -lt 15 ]; do
 	        ping -c 1 www.google.com >/dev/null 2>&1 && break
