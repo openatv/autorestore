@@ -179,7 +179,7 @@ restore_plugins() {
 	pkgs=""
 	for pkg in $allpkgs; do
 		if echo $pkg | grep -q "\-feed\-"; then
-			opkg install $pkg >>$LOG 2>>$LOG || true
+			opkg --force-overwrite install $pkg >>$LOG 2>>$LOG || true
 			opkg update >>$LOG 2>>$LOG || true
 		else
 			pkgs="$pkgs $pkg"
@@ -196,7 +196,7 @@ restore_plugins() {
 	done
 	echo >>$LOG
 	echo "Installing plugins from feeds ..." >> $LOG
-	opkg install $pkgs >>$LOG 2>>$LOG
+	opkg --force-overwrite install $pkgs >>$LOG 2>>$LOG
 	echo >>$LOG
 }
 
