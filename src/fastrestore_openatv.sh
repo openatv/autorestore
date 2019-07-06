@@ -226,7 +226,6 @@ restart_services() {
 	echo "Backgrounding service restarts ..." >>$LOG
 	[ -e "${ROOTFS}etc/init.d/modutils.sh" ] && ${ROOTFS}etc/init.d/modutils.sh >/dev/null >&1
 	[ -e "${ROOTFS}etc/init.d/modload.sh" ] && ${ROOTFS}etc/init.d/modload.sh >/dev/null >&1
-	[ -e "${ROOTFS}etc/init.d/softcam" ] && nohup $(${ROOTFS}etc/init.d/softcam restart) >/dev/null >&1 &
 	echo >>$LOG
 }
 
