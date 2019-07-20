@@ -158,8 +158,8 @@ restart_network() {
 	sleep 3
 	x=0
 	while [ $x -lt 15 ]; do
-	        ping -c 1 www.google.com >/dev/null 2>&1 && break
-		ping6 -c 1 www.google.com >/dev/null 2>&1 && break
+	        ping -c 1 www.google.com | grep -q "1 received" && break
+		ping6 -c 1 www.google.com | grep -q "1 received" && break
 	        x=$((x+1))
 	done
 	echo "Waited about $((x+3)) seconds for network reconnect." >>$LOG 2>>$LOG
