@@ -4,6 +4,10 @@
 ROOTFS=/
 LOG=/home/root/FastRestore.log
 
+
+PY=python
+[[ -e /usr/bin/python3 ]] && PY=python3
+
 do_panic() {
 	rm /media/*/images/config/noplugins 2>/dev/null || true
 	rm /media/*/images/config/settings 2>/dev/null || true
@@ -38,7 +42,7 @@ get_restoremode() {
 }
 
 get_backupset() {
-	backuplocation=$(python - <<END
+	backuplocation=$($PY - <<END
 import sys
 sys.path.append('/usr/lib/enigma2/python')
 from boxbranding import getBoxType, getMachineBrand, getMachineName, getImageDistro
@@ -48,18 +52,18 @@ if boxtype in ('maram9', 'classm', 'axodin', 'axodinc', 'starsatlx', 'genius', '
 	backuplocation = '/media/backup/backup_'
 else:
 	backuplocation = '/media/hdd/backup_'
-print backuplocation+distro+"_"+boxtype
+print(backuplocation+distro+"_"+boxtype)
 END
 	)
 }
 
 get_boxtype() {
-	boxtype=$(python - <<END
+	boxtype=$($PY - <<END
 import sys
 sys.path.append('/usr/lib/enigma2/python')
 from boxbranding import getBoxType, getMachineBrand, getMachineName, getImageDistro
 boxtype = getBoxType()
-print boxtype
+print(boxtype)
 END
 	)
 }
@@ -105,29 +109,29 @@ spinner() {
 }
 
 get_rightset() {
-	RIGHTSET=$(python - <<END
+	RIGHTSET=$($PY - <<END
 import sys
 sys.path.append('/usr/lib/enigma2/python/Plugins/SystemPlugins/SoftwareManager')
 import ShellCompatibleFunctions
-print ShellCompatibleFunctions.MANDATORY_RIGHTS
+print(ShellCompatibleFunctions.MANDATORY_RIGHTS)
 END
 	)
 }
 
 get_blacklist() {
-	BLACKLIST=$(python - <<END
+	BLACKLIST=$($PY - <<END
 import sys
 sys.path.append('/usr/lib/enigma2/python/Plugins/SystemPlugins/SoftwareManager')
 import ShellCompatibleFunctions
 TMPLIST=ShellCompatibleFunctions.BLACKLISTED
 TMPLIST.insert(0, "")
-print " --exclude=".join(TMPLIST)
+print(" --exclude=".join(TMPLIST))
 END
 	)
 }
 
 do_restoreUserDB() {
-	$(python - <<END
+	$($PY - <<END
 import sys
 sys.path.append('/usr/lib/enigma2/python/Plugins/SystemPlugins/SoftwareManager')
 from ShellCompatibleFunctions import restoreUserDB
