@@ -257,7 +257,7 @@ echo >> $LOG
 echo >> $LOG
 
 # Restore settings ...
-(restore_settings) &
+restore_settings
 spinner $! "Settings "
 echo >>$LOG
 
