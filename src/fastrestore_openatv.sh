@@ -204,6 +204,18 @@ restore_plugins() {
 	echo >>$LOG
 }
 
+remove_plugins() {
+	# remove plugins ...
+	echo >>$LOG
+	echo "manually removed by the user plugins" >> $LOG
+	echo >>$LOG
+	allpkgs=$(<${ROOTFS}tmp/removed-list.txt)
+	for pkg in $allpkgs; do
+		opkg --autoremove --force-depends remove $pkg >>$LOG 2>>$LOG || true
+	done
+	echo >>$LOG
+}
+
 restart_services() {
 	echo >>$LOG
 	echo "Running in turbo mode ... remounting and restarting some services ..." >>$LOG
@@ -271,6 +283,12 @@ echo >>$LOG
 
 if [ $plugins -eq 1 ] && [ -e ${ROOTFS}tmp/installed-list.txt ]; then
 	(restore_plugins) &
+	spinner $! "Plugins "
+	echo >>$LOG
+fi
+
+if [ $plugins -eq 1 ] && [ -e ${ROOTFS}tmp/removed-list.txt ]; then
+	(remove_plugins) &
 	spinner $! "Plugins "
 	echo >>$LOG
 fi
