@@ -279,7 +279,7 @@ spinner $! "Network "
 echo >>$LOG
 
 # Restart certain services and remount media in "turbo" mode ...
-(restart_services) &
+(restart_services)
 
 if [ $plugins -eq 1 ] && [ -e ${ROOTFS}tmp/installed-list.txt ]; then
 	(restore_plugins) &
