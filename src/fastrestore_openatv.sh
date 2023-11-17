@@ -1,4 +1,9 @@
 #!/bin/bash
+
+# sync time and date
+/etc/init.d/chronyd restart
+sleep 1
+
 [ -e /etc/enigma2/settings ] && exit 0
 
 ROOTFS=/
