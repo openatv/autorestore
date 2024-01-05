@@ -35,6 +35,12 @@ get_restoremode() {
 		[ -e /media/${i}/images/config/plugins ] && plugins=1
 		[ -e /media/${i}/images/config/slow ] && slow=1
 		[ -e /media/${i}/images/config/fast ] && fast=1 && turbo=0
+		echo "RestoreMode: mound:$i settings:$settings" >>$LOG
+		echo "RestoreMode: mound:$i noplugins:$noplugins" >>$LOG
+		echo "RestoreMode: mound:$i plugins:$plugins" >>$LOG
+		echo "RestoreMode: mound:$i slow:$slow" >>$LOG
+		echo "RestoreMode: mound:$i fast:$fast" >>$LOG
+		echo "RestoreMode: mound:$i turbo:$turbo" >>$LOG
 	done
 
 	# If "noplugins" and "plugins" is set at the same time, "plugins" wins
@@ -44,6 +50,12 @@ get_restoremode() {
 	# if neither "plugins" nor "noplugins" are set, fall back to "slow", because "ask user" can not be done in a boot script
 	# "slow" takes precedence over "fast"/"turbo" if explicitely set
 	fast=$((settings & (plugins | noplugins) & ! slow))
+	echo "RestoreMode: final settings:$settings" >>$LOG
+	echo "RestoreMode: final noplugins:$noplugins" >>$LOG
+	echo "RestoreMode: final plugins:$plugins" >>$LOG
+	echo "RestoreMode: final slow:$slow" >>$LOG
+	echo "RestoreMode: final fast:$fast" >>$LOG
+	echo "RestoreMode: final turbo:$turbo" >>$LOG
 }
 
 get_backupset() {
@@ -291,6 +303,13 @@ restart_services() {
 }
 
 [ -e /media/*/panic.update ] && do_panic
+
+echo "blkid:" >>$LOG
+blkid >>$LOG
+echo >>$LOG
+echo "mounts:" >>$LOG
+mount >>$LOG
+echo >>$LOG
 
 get_restoremode
 
