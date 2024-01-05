@@ -158,6 +158,26 @@ restore_settings() {
 	echo >>$LOG
 }
 
+# Function to check if a given string is a valid IPv4 address
+is_valid_ipv4() {
+    local ip=$1
+    if [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Function to check if a given string is a valid IPv6 address
+is_valid_ipv6() {
+    local ip=$1
+    if [[ $ip =~ ^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$ ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 restart_network() {
 	echo >>$LOG
 	echo "Restarting network ..." >>$LOG
@@ -165,6 +185,26 @@ restart_network() {
 	[ -e "${ROOTFS}etc/init.d/hostname.sh" ] && ${ROOTFS}etc/init.d/hostname.sh
 	[ -e "${ROOTFS}etc/init.d/networking" ] && ${ROOTFS}etc/init.d/networking restart >>$LOG
 	sleep 3
+	nameserversdns_conf="/etc/enigma2/nameserversdns.conf"
+	resolv_conf="/etc/resolv.conf"
+
+	# Check if the file /etc/enigma2/nameserversdns.conf exists
+	if [ -f "$nameserversdns_conf" ]; then
+		# Extract IP addresses from nameserversdns.conf
+		ip_addresses=$(grep -Eo '([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)|([0-9a-fA-F:]+)' "$nameserversdns_conf")
+		valid_ip_found=false
+		# Loop through each extracted IP address
+		for ip in $ip_addresses; do
+			if is_valid_ipv4 "$ip" || is_valid_ipv6 "$ip"; then
+				valid_ip_found=true
+				break
+			fi
+		done
+		if $valid_ip_found; then
+			# Replace /etc/resolv.conf with the content of nameserversdns.conf
+			cat "$nameserversdns_conf" > "$resolv_conf"
+		fi
+	fi
 	x=0
 	while [ $x -lt 15 ]; do
 	        ping -c 1 www.google.com | grep -q "1 received" && break
