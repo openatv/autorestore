@@ -24,15 +24,15 @@ get_restoremode() {
 	# Find all folders under /media
 	media_folders=$(find /media -mindepth 1 -maxdepth 1 -type d)
 
+	settings=0
+	noplugins=0
+	plugins=0
+	slow=0
+	fast=0
+	turbo=1
+
 	# Iterate through each folder found under /media
 	for folder in $media_folders; do
-		settings=0
-		noplugins=0
-		plugins=0
-		slow=0
-		fast=0
-		turbo=1
-
 		# Check if the specific config files exist in the current folder
 		[ -e "$folder/images/config/settings" ] && settings=1
 		[ -e "$folder/images/config/noplugins" ] && noplugins=1
