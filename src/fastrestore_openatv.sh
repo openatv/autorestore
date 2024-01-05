@@ -21,26 +21,32 @@ do_panic() {
 }
 
 get_restoremode() {
-	settings=0
-	plugins=0
-	noplugins=0
+	# Find all folders under /media
+	media_folders=$(find /media -mindepth 1 -maxdepth 1 -type d)
 
-	slow=0
-	fast=0
-	turbo=1
+	# Iterate through each folder found under /media
+	for folder in $media_folders; do
+		settings=0
+		noplugins=0
+		plugins=0
+		slow=0
+		fast=0
+		turbo=1
 
-	for i in hdd mmc usb backup; do
-		[ -e /media/${i}/images/config/settings ] && settings=1
-		[ -e /media/${i}/images/config/noplugins ] && noplugins=1
-		[ -e /media/${i}/images/config/plugins ] && plugins=1
-		[ -e /media/${i}/images/config/slow ] && slow=1
-		[ -e /media/${i}/images/config/fast ] && fast=1 && turbo=0
-		echo "RestoreMode: mound:$i settings:$settings" >>$LOG
-		echo "RestoreMode: mound:$i noplugins:$noplugins" >>$LOG
-		echo "RestoreMode: mound:$i plugins:$plugins" >>$LOG
-		echo "RestoreMode: mound:$i slow:$slow" >>$LOG
-		echo "RestoreMode: mound:$i fast:$fast" >>$LOG
-		echo "RestoreMode: mound:$i turbo:$turbo" >>$LOG
+		# Check if the specific config files exist in the current folder
+		[ -e "$folder/images/config/settings" ] && settings=1
+		[ -e "$folder/images/config/noplugins" ] && noplugins=1
+		[ -e "$folder/images/config/plugins" ] && plugins=1
+		[ -e "$folder/images/config/slow" ] && slow=1
+		[ -e "$folder/images/config/fast" ] && fast=1 && turbo=0
+
+		# Append results to the log file
+		echo "RestoreMode: mount: $(basename "$folder") settings: $settings" >> "$LOG"
+		echo "RestoreMode: mount: $(basename "$folder") noplugins: $noplugins" >> "$LOG"
+		echo "RestoreMode: mount: $(basename "$folder") plugins: $plugins" >> "$LOG"
+		echo "RestoreMode: mount: $(basename "$folder") slow: $slow" >> "$LOG"
+		echo "RestoreMode: mount: $(basename "$folder") fast: $fast" >> "$LOG"
+		echo "RestoreMode: mount: $(basename "$folder") turbo: $turbo" >> "$LOG"
 	done
 
 	# If "noplugins" and "plugins" is set at the same time, "plugins" wins
