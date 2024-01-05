@@ -56,12 +56,12 @@ get_restoremode() {
 	# if neither "plugins" nor "noplugins" are set, fall back to "slow", because "ask user" can not be done in a boot script
 	# "slow" takes precedence over "fast"/"turbo" if explicitely set
 	fast=$((settings & (plugins | noplugins) & ! slow))
-	echo "RestoreMode: final settings:$settings" >>$LOG
-	echo "RestoreMode: final noplugins:$noplugins" >>$LOG
-	echo "RestoreMode: final plugins:$plugins" >>$LOG
-	echo "RestoreMode: final slow:$slow" >>$LOG
-	echo "RestoreMode: final fast:$fast" >>$LOG
-	echo "RestoreMode: final turbo:$turbo" >>$LOG
+	echo "RestoreMode: final settings: $settings" >> "$LOG"
+	echo "RestoreMode: final noplugins: $noplugins" >> "$LOG"
+	echo "RestoreMode: final plugins: $plugins" >> "$LOG"
+	echo "RestoreMode: final slow: $slow" >> "$LOG"
+	echo "RestoreMode: final fast: $fast" >> "$LOG"
+	echo "RestoreMode: final turbo: $turbo" >> "$LOG"
 }
 
 get_backupset() {
