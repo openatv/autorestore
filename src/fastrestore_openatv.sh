@@ -209,17 +209,23 @@ restart_network() {
 	# Check if the file /etc/enigma2/nameserversdns.conf exists
 	if [ -f "$nameserversdns_conf" ]; then
 		# Extract IP addresses from nameserversdns.conf
+		echo >>$LOG
+		echo "Found nameserversdns.conf" >>$LOG
 		ip_addresses=$(grep -Eo '([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)|([0-9a-fA-F:]+)' "$nameserversdns_conf")
 		valid_ip_found=false
 		# Loop through each extracted IP address
 		for ip in $ip_addresses; do
 			if is_valid_ipv4 "$ip" || is_valid_ipv6 "$ip"; then
 				valid_ip_found=true
+				echo >>$LOG
+				echo "Found valid ip in nameserversdns.conf" >>$LOG
 				break
 			fi
 		done
 		if $valid_ip_found; then
 			# Replace /etc/resolv.conf with the content of nameserversdns.conf
+			echo >>$LOG
+			echo "Replace /etc/resolv.conf with the content of nameserversdns.conf" >>$LOG
 			cat "$nameserversdns_conf" > "$resolv_conf"
 		fi
 	fi
