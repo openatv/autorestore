@@ -81,14 +81,14 @@ get_backupset() {
         fi
     done
     if [ -z "${found_location}" ]; then
-        found_location="/media/hdd/backup_${distro}_${model}"
+        found_location="/media/hdd/backup_${distro}_${machinebuild}"
     fi
     backuplocation="${found_location}"
 }
 
 get_boxtype() {
 source /usr/lib/enigma.info
-boxtype=${model}
+boxtype=${machinebuild}
 }
 
 show_logo() {
