@@ -65,30 +65,30 @@ get_restoremode() {
 }
 
 get_backupset() {
-	backuplocation=$($PY - <<END
-import sys
-sys.path.append('/usr/lib/enigma2/python')
-from boxbranding import getBoxType, getMachineBrand, getMachineName, getImageDistro
-boxtype = getBoxType()
-distro = getImageDistro()
-if boxtype in ('maram9', 'classm', 'axodin', 'axodinc', 'starsatlx', 'genius', 'evo', 'galaxym6') and not path.exists("/media/hdd/backup_%s_%s" % (distro, boxtype)):
-	backuplocation = '/media/backup/backup_'
-else:
-	backuplocation = '/media/hdd/backup_'
-print(backuplocation+distro+"_"+boxtype)
-END
-	)
+    source /usr/lib/enigma.info
+    backup_locations=(
+        "/media/backup/backup_${distro}_${machinebuild}"
+        "/media/backup/backup_${distro}_${model}"
+        "/media/hdd/backup_${distro}_${machinebuild}"
+        "/media/hdd/backup_${distro}_${model}"
+    )
+    filename="enigma2settingsbackup.tar.gz"
+    found_location=""
+    for location in "${backup_locations[@]}"; do
+        if [ -e "${location}/${filename}" ]; then
+            found_location="${location}"
+            break
+        fi
+    done
+    if [ -z "${found_location}" ]; then
+        found_location="/media/hdd/backup_${distro}_${model}"
+    fi
+    backuplocation="${found_location}"
 }
 
 get_boxtype() {
-	boxtype=$($PY - <<END
-import sys
-sys.path.append('/usr/lib/enigma2/python')
-from boxbranding import getBoxType, getMachineBrand, getMachineName, getImageDistro
-boxtype = getBoxType()
-print(boxtype)
-END
-	)
+source /usr/lib/enigma.info
+boxtype=${model}
 }
 
 show_logo() {
