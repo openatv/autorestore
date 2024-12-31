@@ -1,19 +1,20 @@
 #!/bin/bash
 
-# sync time and date
-/etc/init.d/chronyd restart
-sleep 1
-
-[ -e /etc/enigma2/settings ] && exit 0
-
 ROOTFS=/
 LOG=/home/root/FastRestore.log
-
-
+echo "Fastrestore: start" >> "$LOG"
+# sync time and date
+/etc/init.d/chronyd restart
+echo "Fastrestore: chronyd restart" >> "$LOG"
+sleep 1
+echo "Fastrestore: check settings" >> "$LOG"
+[ -e /etc/enigma2/settings ] && exit 0
+echo "Fastrestore: settings not exist start settings-restore" >> "$LOG"
 PY=python
 [[ -e /usr/bin/python3 ]] && PY=python3
-
+echo "Fastrestore: Python:$PY" >> "$LOG"
 do_panic() {
+	echo "Fastrestore:do_panic" >> "$LOG"
 	rm /media/*/images/config/noplugins 2>/dev/null || true
 	rm /media/*/images/config/settings 2>/dev/null || true
 	rm /media/*/images/config/plugins 2>/dev/null || true
@@ -21,6 +22,7 @@ do_panic() {
 }
 
 get_restoremode() {
+	echo "Fastrestore:get_restoremode" >> "$LOG"
 	# Find all folders under /media
 	media_folders=$(find /media -mindepth 1 -maxdepth 1 -type d)
 
@@ -65,25 +67,36 @@ get_restoremode() {
 }
 
 get_backupset() {
+    echo "Fastrestore:get_backupset" >> "$LOG"
     source /usr/lib/enigma.info
-    backup_locations=(
-        "/media/backup/backup_${distro}_${machinebuild}"
-        "/media/backup/backup_${distro}_${model}"
-        "/media/hdd/backup_${distro}_${machinebuild}"
-        "/media/hdd/backup_${distro}_${model}"
-    )
+    # Find all folders under /media
+    media_folders=$(find /media -mindepth 1 -maxdepth 1 -type d)
     filename="enigma2settingsbackup.tar.gz"
     found_location=""
-    for location in "${backup_locations[@]}"; do
-        if [ -e "${location}/${filename}" ]; then
-            found_location="${location}"
+    
+    # Iterate through all folders found under /media
+    for folder in $media_folders; do
+        echo "Fastrestore:check backupset folder:$folder" >> "$LOG"
+        # Check if the backup file exists in the current folder
+        if [ -e "$folder/backup_${distro}_${machinebuild}/${filename}" ]; then
+            found_location="$folder/backup_${distro}_${machinebuild}"
+            echo "Fastrestore:check backupset found_location:$found_location" >> "$LOG"
+            break
+        elif [ -e "$folder/backup_${distro}_${model}/${filename}" ]; then
+            found_location="$folder/backup_${distro}_${model}"
+            echo "Fastrestore:check backupset found_location:$found_location" >> "$LOG"
             break
         fi
     done
-    if [ -z "${found_location}" ]; then
+    
+    # If no backup file is found in specific folders, set a default location
+    if [ -z "$found_location" ]; then
         found_location="/media/hdd/backup_${distro}_${machinebuild}"
+        echo "Fastrestore:user fallback location:$found_location" >> "$LOG"
     fi
-    backuplocation="${found_location}"
+    
+    backuplocation="$found_location"
+    echo "Fastrestore:backuplocation:$backuplocation" >> "$LOG"
 }
 
 get_boxtype() {
@@ -92,12 +105,14 @@ boxtype=${machinebuild}
 }
 
 show_logo() {
+	echo "Fastrestore:show_logo" >> "$LOG"
 	BOOTLOGO=/usr/share/restore.mvi
 	[ ! -e $BOOTLOGO ] && BOOTLOGO=/usr/share/bootlogo.mvi
 	[ -e $BOOTLOGO ] && nohup $(/usr/bin/showiframe ${BOOTLOGO}) >/dev/null 2>&1 &
 }
 
 lock_device() {
+	echo "Fastrestore:lock_device" >> "$LOG"
 	get_boxtype
 
 	DEV=/dev/null
@@ -116,6 +131,7 @@ lock_device() {
 }
 
 spinner() {
+	echo "Fastrestore:spinner" >> "$LOG"
 	local pid=$1
 	local task=$2
 	local delay=0.025
@@ -132,6 +148,7 @@ spinner() {
 }
 
 get_rightset() {
+	echo "Fastrestore:get_rightset" >> "$LOG"
 	RIGHTSET=$($PY - <<END
 import sys
 sys.path.append('/usr/lib/enigma2/python/Plugins/SystemPlugins/SoftwareManager')
@@ -142,6 +159,7 @@ END
 }
 
 get_blacklist() {
+	echo "Fastrestore:get_blacklist" >> "$LOG"
 	BLACKLIST=$($PY - <<END
 import sys
 sys.path.append('/usr/lib/enigma2/python/Plugins/SystemPlugins/SoftwareManager')
@@ -154,6 +172,7 @@ END
 }
 
 do_restoreUserDB() {
+	echo "Fastrestore:do_restoreUserDB" >> "$LOG"
 	$($PY - <<END
 import sys
 sys.path.append('/usr/lib/enigma2/python/Plugins/SystemPlugins/SoftwareManager')
@@ -178,6 +197,7 @@ restore_settings() {
 
 # Function to check if a given string is a valid IPv4 address
 is_valid_ipv4() {
+    echo "Fastrestore:is_valid_ipv4" >> "$LOG"
     local ip=$1
     if [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         return 0
@@ -188,6 +208,7 @@ is_valid_ipv4() {
 
 # Function to check if a given string is a valid IPv6 address
 is_valid_ipv6() {
+    echo "Fastrestore:is_valid_ipv6" >> "$LOG"
     local ip=$1
     if [[ $ip =~ ^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$ ]]; then
         return 0
@@ -324,12 +345,12 @@ mount >>$LOG
 echo >>$LOG
 
 get_restoremode
-
+echo "Fastrestore:get_restoremode done. fast:$fast" >> "$LOG"
 # Only continue in fast mode (includes turbo mode)
 [ $fast -eq 1 ] || exit 0
-
+echo "Fastrestore:start fast restore" >> "$LOG"
 get_backupset
-
+echo "Fastrestore:get_backupset done, backuplocation:$backuplocation " >> "$LOG"
 # Exit if there is no backup set
 [ ! -e "$backuplocation/enigma2settingsbackup.tar.gz" ] && exit 0
 
@@ -340,7 +361,7 @@ show_logo
 lock_device
 
 # Begin logging
-echo "FastRestore is restoring settings ..." > $LOG
+echo "FastRestore is restoring settings ..." >> $LOG
 echo >> $LOG
 echo >> $LOG
 
