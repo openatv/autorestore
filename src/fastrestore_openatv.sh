@@ -151,8 +151,12 @@ get_rightset() {
 	echo "Fastrestore:get_rightset" >> "$LOG"
 	RIGHTSET=$($PY - <<END
 import sys
-sys.path.append('/usr/lib/enigma2/python/Plugins/SystemPlugins/SoftwareManager')
-import ShellCompatibleFunctions
+sys.path.append('/usr/lib/enigma2/python/Tools')
+try:
+	import ShellCompatibleFunctions
+except ImportError:
+	sys.path.append('/usr/lib/enigma2/python/Plugins/SystemPlugins/SoftwareManager')
+	import ShellCompatibleFunctions
 print(ShellCompatibleFunctions.MANDATORY_RIGHTS)
 END
 	)
@@ -162,8 +166,12 @@ get_blacklist() {
 	echo "Fastrestore:get_blacklist" >> "$LOG"
 	BLACKLIST=$($PY - <<END
 import sys
-sys.path.append('/usr/lib/enigma2/python/Plugins/SystemPlugins/SoftwareManager')
-import ShellCompatibleFunctions
+sys.path.append('/usr/lib/enigma2/python/Tools')
+try:
+	import ShellCompatibleFunctions
+except ImportError:
+	sys.path.append('/usr/lib/enigma2/python/Plugins/SystemPlugins/SoftwareManager')
+	import ShellCompatibleFunctions
 TMPLIST=ShellCompatibleFunctions.BLACKLISTED
 TMPLIST.insert(0, "")
 print(" --exclude=".join(TMPLIST))
@@ -175,12 +183,48 @@ do_restoreUserDB() {
 	echo "Fastrestore:do_restoreUserDB" >> "$LOG"
 	$($PY - <<END
 import sys
-sys.path.append('/usr/lib/enigma2/python/Plugins/SystemPlugins/SoftwareManager')
-from ShellCompatibleFunctions import restoreUserDB
-restoreUserDB()
+sys.path.append('/usr/lib/enigma2/python/Tools')
+try:
+	from ShellCompatibleFunctions import restoreUserDB
+	restoreUserDB()
+except ImportError:
+	sys.path.append('/usr/lib/enigma2/python/Plugins/SystemPlugins/SoftwareManager')
+	from ShellCompatibleFunctions import restoreUserDB
+	restoreUserDB()
 END
 	)
 }
+
+restore_rctype_settings() {
+    echo >>$LOG
+    echo "Extracting saved settings from $backuplocation/enigma2settingsbackup.tar.gz" >>$LOG
+    echo >>$LOG
+
+    # Extract the settings file from the tar.gz to a temporary location
+    temp_settings=$(mktemp)
+    tar -xzf "$backuplocation/enigma2settingsbackup.tar.gz" -O etc/enigma2/settings > "$temp_settings" 2>>$LOG
+
+    # Check if the specific entry exists and extract its value
+    rctype=$(grep -oP '^config\.plugins\.remotecontroltype\.rctype=\K.*' "$temp_settings")
+
+    if [ -n "$rctype" ]; then
+        echo "Found remote control type: $rctype" >>$LOG
+
+        # Check if the target file exists in the proc filesystem
+        if [ -e /proc/stb/ir/rc/type ]; then
+            echo "Writing remote control type to /proc/stb/ir/rc/type" >>$LOG
+            echo "$rctype" > /proc/stb/ir/rc/type
+        else
+            echo "/proc/stb/ir/rc/type does not exist, skipping." >>$LOG
+        fi
+    else
+        echo "Remote control type not found in settings file." >>$LOG
+    fi
+
+    # Clean up the temporary file
+    rm -f "$temp_settings"
+}
+
 
 restore_settings() {
 	echo >>$LOG
@@ -345,6 +389,17 @@ mount >>$LOG
 echo >>$LOG
 
 get_restoremode
+
+if [ "$SLOW" -eq 1 ]; then
+    get_backupset
+    echo "Slowrestore:get_backupset done, backuplocation:$backuplocation " >> "$LOG"
+    # Exit if there is no backup set
+    [ ! -e "$backuplocation/enigma2settingsbackup.tar.gz" ] && exit 0
+    restore_rctype_settings
+    echo "Slowrestore:get_restoremode done. slow:$SLOW" >> "$LOG"
+    exit 0
+fi
+
 echo "Fastrestore:get_restoremode done. fast:$fast" >> "$LOG"
 # Only continue in fast mode (includes turbo mode)
 [ $fast -eq 1 ] || exit 0
