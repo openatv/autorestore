@@ -334,7 +334,10 @@ restore_plugins() {
 	done
 	echo >>$LOG
 	echo "Installing plugins from feeds ..." >> $LOG
-	opkg --force-overwrite install $pkgs >>$LOG 2>>$LOG
+	for pkg in $pkgs; do
+		echo "Installing $pkg ..." >>$LOG
+		opkg --force-overwrite install $pkg >>$LOG 2>>$LOG
+	done
 	echo >>$LOG
 }
 
