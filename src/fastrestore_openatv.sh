@@ -2,19 +2,24 @@
 
 ROOTFS=/
 LOG=/home/root/FastRestore.log
-echo "Fastrestore: start" >> "$LOG"
+
+log() {
+	echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"
+}
+
+log "Fastrestore: start"
 # sync time and date
 /etc/init.d/chronyd restart
-echo "Fastrestore: chronyd restart" >> "$LOG"
+log "Fastrestore: chronyd restart"
 sleep 1
-echo "Fastrestore: check settings" >> "$LOG"
+log "Fastrestore: check settings"
 [ -e /etc/enigma2/settings ] && exit 0
-echo "Fastrestore: settings not exist start settings-restore" >> "$LOG"
+log "Fastrestore: settings not exist start settings-restore" 
 PY=python
 [[ -e /usr/bin/python3 ]] && PY=python3
-echo "Fastrestore: Python:$PY" >> "$LOG"
+log "Fastrestore: Python:$PY" 
 do_panic() {
-	echo "Fastrestore:do_panic" >> "$LOG"
+	log "Fastrestore:do_panic" 
 	rm /media/*/images/config/noplugins 2>/dev/null || true
 	rm /media/*/images/config/settings 2>/dev/null || true
 	rm /media/*/images/config/plugins 2>/dev/null || true
@@ -22,7 +27,7 @@ do_panic() {
 }
 
 get_restoremode() {
-	echo "Fastrestore:get_restoremode" >> "$LOG"
+	log "Fastrestore:get_restoremode" 
 	# Find all folders under /media
 	media_folders=$(find /media -mindepth 1 -maxdepth 1 -type d)
 
@@ -43,12 +48,12 @@ get_restoremode() {
 		[ -e "$folder/images/config/fast" ] && fast=1 && turbo=0
 
 		# Append results to the log file
-		echo "RestoreMode: mount: $(basename "$folder") settings: $settings" >> "$LOG"
-		echo "RestoreMode: mount: $(basename "$folder") noplugins: $noplugins" >> "$LOG"
-		echo "RestoreMode: mount: $(basename "$folder") plugins: $plugins" >> "$LOG"
-		echo "RestoreMode: mount: $(basename "$folder") slow: $slow" >> "$LOG"
-		echo "RestoreMode: mount: $(basename "$folder") fast: $fast" >> "$LOG"
-		echo "RestoreMode: mount: $(basename "$folder") turbo: $turbo" >> "$LOG"
+		log "RestoreMode: mount: $(basename "$folder") settings: $settings" 
+		log "RestoreMode: mount: $(basename "$folder") noplugins: $noplugins" 
+		log "RestoreMode: mount: $(basename "$folder") plugins: $plugins" 
+		log "RestoreMode: mount: $(basename "$folder") slow: $slow" 
+		log "RestoreMode: mount: $(basename "$folder") fast: $fast" 
+		log "RestoreMode: mount: $(basename "$folder") turbo: $turbo" 
 	done
 
 	# If "noplugins" and "plugins" is set at the same time, "plugins" wins
@@ -58,16 +63,16 @@ get_restoremode() {
 	# if neither "plugins" nor "noplugins" are set, fall back to "slow", because "ask user" can not be done in a boot script
 	# "slow" takes precedence over "fast"/"turbo" if explicitely set
 	fast=$((settings & (plugins | noplugins) & ! slow))
-	echo "RestoreMode: final settings: $settings" >> "$LOG"
-	echo "RestoreMode: final noplugins: $noplugins" >> "$LOG"
-	echo "RestoreMode: final plugins: $plugins" >> "$LOG"
-	echo "RestoreMode: final slow: $slow" >> "$LOG"
-	echo "RestoreMode: final fast: $fast" >> "$LOG"
-	echo "RestoreMode: final turbo: $turbo" >> "$LOG"
+	log "RestoreMode: final settings: $settings" 
+	log "RestoreMode: final noplugins: $noplugins" 
+	log "RestoreMode: final plugins: $plugins" 
+	log "RestoreMode: final slow: $slow" 
+	log "RestoreMode: final fast: $fast" 
+	log "RestoreMode: final turbo: $turbo" 
 }
 
 get_backupset() {
-    echo "Fastrestore:get_backupset" >> "$LOG"
+    log "Fastrestore:get_backupset" 
     source /usr/lib/enigma.info
     # Find all folders under /media
     media_folders=$(find /media -mindepth 1 -maxdepth 1 -type d)
@@ -76,15 +81,15 @@ get_backupset() {
     
     # Iterate through all folders found under /media
     for folder in $media_folders; do
-        echo "Fastrestore:check backupset folder:$folder" >> "$LOG"
+        log "Fastrestore:check backupset folder:$folder" 
         # Check if the backup file exists in the current folder
         if [ -e "$folder/backup_${distro}_${machinebuild}/${filename}" ]; then
             found_location="$folder/backup_${distro}_${machinebuild}"
-            echo "Fastrestore:check backupset found_location:$found_location" >> "$LOG"
+            log "Fastrestore:check backupset found_location:$found_location" 
             break
         elif [ -e "$folder/backup_${distro}_${model}/${filename}" ]; then
             found_location="$folder/backup_${distro}_${model}"
-            echo "Fastrestore:check backupset found_location:$found_location" >> "$LOG"
+            log "Fastrestore:check backupset found_location:$found_location" 
             break
         fi
     done
@@ -92,11 +97,11 @@ get_backupset() {
     # If no backup file is found in specific folders, set a default location
     if [ -z "$found_location" ]; then
         found_location="/media/hdd/backup_${distro}_${machinebuild}"
-        echo "Fastrestore:user fallback location:$found_location" >> "$LOG"
+        log "Fastrestore:user fallback location:$found_location" 
     fi
     
     backuplocation="$found_location"
-    echo "Fastrestore:backuplocation:$backuplocation" >> "$LOG"
+    log "Fastrestore:backuplocation:$backuplocation" 
 }
 
 get_boxtype() {
@@ -105,14 +110,14 @@ boxtype=${machinebuild}
 }
 
 show_logo() {
-	echo "Fastrestore:show_logo" >> "$LOG"
+	log "Fastrestore:show_logo" 
 	BOOTLOGO=/usr/share/restore.mvi
 	[ ! -e $BOOTLOGO ] && BOOTLOGO=/usr/share/bootlogo.mvi
 	[ -e $BOOTLOGO ] && nohup $(/usr/bin/showiframe ${BOOTLOGO}) >/dev/null 2>&1 &
 }
 
 lock_device() {
-	echo "Fastrestore:lock_device" >> "$LOG"
+	log "Fastrestore:lock_device" 
 	get_boxtype
 
 	DEV=/dev/null
@@ -131,7 +136,7 @@ lock_device() {
 }
 
 spinner() {
-	echo "Fastrestore:spinner" >> "$LOG"
+	log "Fastrestore:spinner" 
 	local pid=$1
 	local task=$2
 	local delay=0.025
@@ -148,7 +153,7 @@ spinner() {
 }
 
 get_rightset() {
-	echo "Fastrestore:get_rightset" >> "$LOG"
+	log "Fastrestore:get_rightset" 
 	RIGHTSET=$($PY - <<END
 import sys
 sys.path.append('/usr/lib/enigma2/python/Tools')
@@ -163,7 +168,7 @@ END
 }
 
 get_blacklist() {
-	echo "Fastrestore:get_blacklist" >> "$LOG"
+	log "Fastrestore:get_blacklist" 
 	BLACKLIST=$($PY - <<END
 import sys
 sys.path.append('/usr/lib/enigma2/python/Tools')
@@ -180,7 +185,7 @@ END
 }
 
 do_restoreUserDB() {
-	echo "Fastrestore:do_restoreUserDB" >> "$LOG"
+	log "Fastrestore:do_restoreUserDB" 
 	$($PY - <<END
 import sys
 sys.path.append('/usr/lib/enigma2/python/Tools')
@@ -196,9 +201,9 @@ END
 }
 
 restore_rctype_settings() {
-    echo >>$LOG
-    echo "Extracting saved settings from $backuplocation/enigma2settingsbackup.tar.gz" >>$LOG
-    echo >>$LOG
+    log "" 
+    log "Extracting saved settings from $backuplocation/enigma2settingsbackup.tar.gz" 
+    log "" 
 
     # Extract the settings file from the tar.gz to a temporary location
     temp_settings=$(mktemp)
@@ -208,17 +213,17 @@ restore_rctype_settings() {
     rctype=$(grep -oP '^config\.plugins\.remotecontroltype\.rctype=\K.*' "$temp_settings")
 
     if [ -n "$rctype" ]; then
-        echo "Found remote control type: $rctype" >>$LOG
+        log "Found remote control type: $rctype" 
 
         # Check if the target file exists in the proc filesystem
         if [ -e /proc/stb/ir/rc/type ]; then
-            echo "Writing remote control type to /proc/stb/ir/rc/type" >>$LOG
-            echo "$rctype" > /proc/stb/ir/rc/type
+            log "Writing remote control type to /proc/stb/ir/rc/type" 
+            log "$rctype" > /proc/stb/ir/rc/type
         else
-            echo "/proc/stb/ir/rc/type does not exist, skipping." >>$LOG
+            log "/proc/stb/ir/rc/type does not exist, skipping." 
         fi
     else
-        echo "Remote control type not found in settings file." >>$LOG
+        log "Remote control type not found in settings file." 
     fi
 
     # Clean up the temporary file
@@ -227,21 +232,21 @@ restore_rctype_settings() {
 
 
 restore_settings() {
-	echo >>$LOG
-	echo "Extracting saved settings from $backuplocation/enigma2settingsbackup.tar.gz" >> $LOG
-	echo >>$LOG
+	log ""
+	log "Extracting saved settings from $backuplocation/enigma2settingsbackup.tar.gz" 
+	log ""
 	get_rightset
 	get_blacklist
 	tar -C $ROOTFS -xzvf $backuplocation/enigma2settingsbackup.tar.gz ${BLACKLIST} >>$LOG 2>>$LOG
 	eval ${RIGHTSET} >>$LOG 2>>$LOG
 	do_restoreUserDB
 	touch /etc/.restore_skins
-	echo >>$LOG
+	log ""
 }
 
 # Function to check if a given string is a valid IPv4 address
 is_valid_ipv4() {
-    echo "Fastrestore:is_valid_ipv4" >> "$LOG"
+    log "Fastrestore:is_valid_ipv4" 
     local ip=$1
     if [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         return 0
@@ -252,7 +257,7 @@ is_valid_ipv4() {
 
 # Function to check if a given string is a valid IPv6 address
 is_valid_ipv6() {
-    echo "Fastrestore:is_valid_ipv6" >> "$LOG"
+    log "Fastrestore:is_valid_ipv6" 
     local ip=$1
     if [[ $ip =~ ^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$ ]]; then
         return 0
@@ -262,101 +267,125 @@ is_valid_ipv6() {
 }
 
 restart_network() {
-	echo >>$LOG
-	echo "Restarting network ..." >>$LOG
-	echo >>$LOG
+	log "" 
+	log "Restarting network ..." 
+	log "" 
+
 	[ -e "${ROOTFS}etc/init.d/hostname.sh" ] && ${ROOTFS}etc/init.d/hostname.sh
 	[ -e "${ROOTFS}etc/init.d/networking" ] && ${ROOTFS}etc/init.d/networking restart >>$LOG
+
 	sleep 3
 	nameserversdns_conf="/etc/enigma2/nameserversdns.conf"
 	resolv_conf="/etc/resolv.conf"
 
-	# Check if the file /etc/enigma2/nameserversdns.conf exists
 	if [ -f "$nameserversdns_conf" ]; then
-		# Extract IP addresses from nameserversdns.conf
-		echo >>$LOG
-		echo "Found nameserversdns.conf" >>$LOG
+		log "" 
+		log "Found nameserversdns.conf" 
 		ip_addresses=$(grep -Eo '([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)|([0-9a-fA-F:]+)' "$nameserversdns_conf")
 		valid_ip_found=false
-		# Loop through each extracted IP address
 		for ip in $ip_addresses; do
 			if is_valid_ipv4 "$ip" || is_valid_ipv6 "$ip"; then
 				valid_ip_found=true
-				echo >>$LOG
-				echo "Found valid ip in nameserversdns.conf" >>$LOG
+				log ""
+				log "Found valid IP: $ip in nameserversdns.conf" 
 				break
 			fi
 		done
 		if $valid_ip_found; then
-			# Replace /etc/resolv.conf with the content of nameserversdns.conf
-			echo >>$LOG
-			echo "Replace /etc/resolv.conf with the content of nameserversdns.conf" >>$LOG
+			log ""
+			log "Replacing /etc/resolv.conf with content of nameserversdns.conf" 
 			cat "$nameserversdns_conf" > "$resolv_conf"
 		fi
 	fi
+
+	log ""
+	log "Checking network connectivity (max 15s) ..."
 	x=0
 	while [ $x -lt 15 ]; do
-	        ping -c 1 www.google.com | grep -q "1 received" && break
-		ping6 -c 1 www.google.com | grep -q "1 received" && break
-	        x=$((x+1))
+		timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+		
+		if ping -c 1 -W 1 www.google.com >/dev/null 2>&1; then
+			log "$timestamp - ping IPv4 successful"
+			break
+		else
+			log "$timestamp - ping IPv4 failed"
+		fi
+
+		if ping6 -c 1 -W 1 www.google.com >/dev/null 2>&1; then
+			log "$timestamp - ping IPv6 successful"
+			break
+		else
+			log "$timestamp - ping IPv6 failed"
+		fi
+
+		x=$((x+1))
+		sleep 1
 	done
-	echo "Waited about $((x+3)) seconds for network reconnect." >>$LOG 2>>$LOG
-	echo >>$LOG
+
+	total_wait=$((x+3))
+	log "Waited about $total_wait seconds for network reconnect."
+	log ""
 }
+
 
 restore_plugins() {
 	# Restore plugins ...
-	echo >>$LOG
-	echo "Re-installing previous plugins" >> $LOG
-	echo >>$LOG
-	echo "Updating feeds ..." >> $LOG
-	opkg update >>$LOG 2>>$LOG
-	echo >>$LOG
-	echo "Installing feeds from feeds ..." >> $LOG
+	log ""
+	log "Re-installing previous plugins" 
+	log "" 
+	log "Updating feeds ..." 
+	opkg update 2>&1 | while IFS= read -r line; do
+		log "$line"
+	done
+
+	log "" 
+	log "Installing feeds from feeds ..." 
 	allpkgs=$(<${ROOTFS}tmp/installed-list.txt)
 	pkgs=""
 	for pkg in $allpkgs; do
 		if echo $pkg | grep -q "\-feed\-"; then
-			opkg --force-overwrite install $pkg >>$LOG 2>>$LOG || true
-			opkg update >>$LOG 2>>$LOG || true
+			opkg --force-overwrite install "$pkg" 2>&1 | while IFS= read -r line; do
+				log "$line"
+			done || true
+			opkg update 2>&1 | while IFS= read -r line; do log "$line"; done || true
 		else
 			pkgs="$pkgs $pkg"
 		fi
 	done
-	echo >>$LOG
-	echo "Installing plugins from local media ..." >> $LOG
+	log ""
+	log "Installing plugins from local media ..." 
 	for i in hdd mmc usb backup; do
 		if ls /media/${i}/images/ipk/*.ipk >/dev/null 2>/dev/null; then
-			echo >>$LOG
-			echo "${i}:" >>$LOG
-			opkg install /media/${i}/images/ipk/*.ipk >>$LOG 2>>$LOG
+			log ""
+			log "${i}:" 
+			opkg install /media/${i}/images/ipk/*.ipk 2>&1 | while IFS= read -r line; do log "$line"; done
 		fi
 	done
-	echo >>$LOG
-	echo "Installing plugins from feeds ..." >> $LOG
+	log ""
+	log "Installing plugins from feeds ..." 
 	for pkg in $pkgs; do
-		echo "Installing $pkg ..." >>$LOG
-		opkg --force-overwrite install $pkg >>$LOG 2>>$LOG
+		log "Installing $pkg ..." 
+		opkg --force-overwrite install $pkg 2>&1 | while IFS= read -r line; do log "$line"; done
 	done
-	echo >>$LOG
+	log ""
 }
 
 remove_plugins() {
 	# remove plugins ...
-	echo >>$LOG
-	echo "manually removed by the user plugins" >> $LOG
-	echo >>$LOG
+	log ""
+	log "manually removed by the user plugins" 
+	log ""
 	allpkgs=$(<${ROOTFS}tmp/removed-list.txt)
 	for pkg in $allpkgs; do
-		opkg --autoremove --force-depends remove $pkg >>$LOG 2>>$LOG || true
+		opkg --autoremove --force-depends remove $pkg 2>&1 | while IFS= read -r line; do log "$line"; done || true
 	done
-	echo >>$LOG
+	log "" 
 }
 
 restart_services() {
-	echo >>$LOG
-	echo "Running in turbo mode ... remounting and restarting some services ..." >>$LOG
-	echo >>$LOG
+	log ""
+	log "Running in turbo mode ... remounting and restarting some services ..." 
+	log ""
 
 	# Linux might have initialized swap on some devices that we need to unmount ...
 	[ -x /sbin/swapoff ] && swapoff -a -e 2>/dev/null
@@ -366,49 +395,50 @@ restart_services() {
 	mounts=$(mount | grep -E '(^/dev/s|\b\cifs\b|\bnfs\b|\bnfs4\b)' | awk '{ print $1 }')
 
 	for i in $mounts; do
-		echo "Unmounting $i ..." >>$LOG
-		umount $i >>$LOG 2>>$LOG
+		log "Unmounting $i ..." 
+		umount $i 2>&1 | while IFS= read -r line; do log "$line"; done
 	done
 	[ -e "${ROOTFS}etc/init.d/volatile-media.sh" ] && ${ROOTFS}etc/init.d/volatile-media.sh
-	echo >>$LOG
-	echo "Mounting all local filesystems ..." >>$LOG
-	mount -a -t nonfs,nfs4,smbfs,cifs,ncp,ncpfs,coda,ocfs2,gfs,gfs2,ceph -O no_netdev >>$LOG 2>>$LOG
-	mdev -s
+	log "" 
+	log "Mounting all local filesystems ..." 
+	mount -a -t nonfs,nfs4,smbfs,cifs,ncp,ncpfs,coda,ocfs2,gfs,gfs2,ceph -O no_netdev 2>&1 | while IFS= read -r line; do log "$line"; done
+	udevadm trigger --action=add
+	udevadm settle
 	[ -x /sbin/swapon ] && swapon -a 2>/dev/null
-	echo >>$LOG
-	echo "Backgrounding service restarts ..." >>$LOG
+	log "" 
+	log "Backgrounding service restarts ..." 
 	[ -e "${ROOTFS}etc/init.d/modutils.sh" ] && ${ROOTFS}etc/init.d/modutils.sh >/dev/null >&1
 	[ -e "${ROOTFS}etc/init.d/modload.sh" ] && ${ROOTFS}etc/init.d/modload.sh >/dev/null >&1
-	echo >>$LOG
+	log "" 
 }
 
 [ -e /media/*/panic.update ] && do_panic
 
-echo "blkid:" >>$LOG
-blkid >>$LOG
-echo >>$LOG
-echo "mounts:" >>$LOG
-mount >>$LOG
-echo >>$LOG
+log "blkid:" 
+blkid 2>&1 | while IFS= read -r line; do log "$line"; done
+log ""
+log "mounts:" 
+mount 2>&1 | while IFS= read -r line; do log "$line"; done
+log ""
 
 get_restoremode
 
 if [ "$SLOW" -eq 1 ]; then
     get_backupset
-    echo "Slowrestore:get_backupset done, backuplocation:$backuplocation " >> "$LOG"
+    log "Slowrestore:get_backupset done, backuplocation:$backuplocation " 
     # Exit if there is no backup set
     [ ! -e "$backuplocation/enigma2settingsbackup.tar.gz" ] && exit 0
     restore_rctype_settings
-    echo "Slowrestore:get_restoremode done. slow:$SLOW" >> "$LOG"
+    log "Slowrestore:get_restoremode done. slow:$SLOW" 
     exit 0
 fi
 
-echo "Fastrestore:get_restoremode done. fast:$fast" >> "$LOG"
+log "Fastrestore:get_restoremode done. fast:$fast" 
 # Only continue in fast mode (includes turbo mode)
 [ $fast -eq 1 ] || exit 0
-echo "Fastrestore:start fast restore" >> "$LOG"
+log "Fastrestore:start fast restore" 
 get_backupset
-echo "Fastrestore:get_backupset done, backuplocation:$backuplocation " >> "$LOG"
+log "Fastrestore:get_backupset done, backuplocation:$backuplocation " 
 # Exit if there is no backup set
 [ ! -e "$backuplocation/enigma2settingsbackup.tar.gz" ] && exit 0
 
@@ -419,19 +449,19 @@ show_logo
 lock_device
 
 # Begin logging
-echo "FastRestore is restoring settings ..." >> $LOG
-echo >> $LOG
-echo >> $LOG
+log "FastRestore is restoring settings ..." 
+log ""
+log ""
 
 # Restore settings ...
 restore_settings
 spinner $! "Settings "
-echo >>$LOG
+log ""
 
 # Restart network ...
 (restart_network) &
 spinner $! "Network "
-echo >>$LOG
+log ""
 
 # Restart certain services and remount media in "turbo" mode ...
 (restart_services)
@@ -439,30 +469,29 @@ echo >>$LOG
 if [ $plugins -eq 1 ] && [ -e ${ROOTFS}tmp/installed-list.txt ]; then
 	(restore_plugins) &
 	spinner $! "Plugins "
-	echo >>$LOG
+	log ""
 fi
 
 if [ $plugins -eq 1 ] && [ -e ${ROOTFS}tmp/removed-list.txt ]; then
 	(remove_plugins) &
 	spinner $! "Plugins "
-	echo >>$LOG
+	log ""
 fi
 
 for i in hdd mmc usb backup; do
 	# Execute MyRestore ...
 	if [ -e /media/${i}/images/config/myrestore.sh ]; then
-		echo >>$LOG
-		echo "Executing MyRestore script in $i" >> $LOG
-		(. /media/${i}/images/config/myrestore.sh >>$LOG 2>>$LOG) &
+		log "" 
+		log "Executing MyRestore script in $i" 
+		(. /media/${i}/images/config/myrestore.sh 2>&1 | while IFS= read -r line; do log "$line"; done) &
 		spinner $! "MyRestore "
-		echo >>$LOG
+		log "" 
 	fi
 done
 
 
 # Reboot here if running in "fast" mode ...
-[ $turbo -eq 0 ] && echo "Running in fast mode ... reboot ..." >>$LOG && sync && reboot
-
+[ "$turbo" -eq 0 ] && { log "Running in fast mode ... reboot ..."; sync; reboot; }
 
 # Restart certain services and remount media in "turbo" mode ...
 (restart_services) &
