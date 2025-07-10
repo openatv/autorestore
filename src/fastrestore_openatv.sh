@@ -352,6 +352,22 @@ restore_plugins() {
 			pkgs="$pkgs $pkg"
 		fi
 	done
+	if [ -f /usr/lib/package.lst ]; then
+		log ""
+		log "Filtering blacklisted packages from install list ..."
+		blacklist=$(awk '{print $1}' /usr/lib/package.lst)
+		new_pkgs=""
+
+		for pkg in $pkgs; do
+			if echo "$blacklist" | grep -qx "$pkg"; then
+				log "Skipping blacklisted package: $pkg"
+			else
+				new_pkgs="$new_pkgs $pkg"
+			fi
+		done
+		pkgs="$new_pkgs"
+		log ""
+	fi
 	log ""
 	log "Installing plugins from local media ..." 
 	for i in hdd mmc usb backup; do
