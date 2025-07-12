@@ -4,7 +4,8 @@ ROOTFS=/
 LOG=/home/root/FastRestore.log
 
 log() {
-	echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"
+    local elapsed=$(printf "%5s" "$SECONDS")
+    echo "[$elapsed sec] $*" >> "$LOG"
 }
 
 log "Fastrestore: start"
