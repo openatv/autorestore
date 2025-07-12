@@ -378,11 +378,16 @@ restore_plugins() {
 		fi
 	done
 	log ""
-	log "Installing plugins from feeds ..." 
-	for pkg in $pkgs; do
-		log "Installing $pkg ..." 
-		opkg --force-overwrite install $pkg 2>&1 | while IFS= read -r line; do log "$line"; done
-	done
+	log "Installing plugins from feeds (fast mode)..." 
+
+	if ! opkg --force-overwrite install $pkgs 2>&1 | while IFS= read -r line; do log "$line"; done; then
+		log "Fast install failed – falling back to safe per-package mode..."
+
+		for pkg in $pkgs; do
+			log "Installing $pkg ..." 
+			opkg --force-overwrite install $pkg 2>&1 | while IFS= read -r line; do log "$line"; done
+		done
+	fi
 	log ""
 }
 
