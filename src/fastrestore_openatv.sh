@@ -2,9 +2,11 @@
 
 ROOTFS=/
 LOG=/home/root/FastRestore.log
+read STARTED _ < /proc/uptime
 
 log() {
-    local elapsed=$(printf "%5s" "$SECONDS")
+    read CURRENT _ < /proc/uptime
+    elapsed=$((${CURRENT%%.*} - ${STARTED%%.*}))
     echo "[$elapsed sec] $*" >> "$LOG"
 }
 
