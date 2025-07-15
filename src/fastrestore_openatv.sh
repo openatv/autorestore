@@ -6,7 +6,7 @@ read STARTED _ < /proc/uptime
 
 log() {
     read CURRENT _ < /proc/uptime
-    elapsed=$((${CURRENT%%.*} - ${STARTED%%.*}))
+    local elapsed=$(printf "%5s" "$((${CURRENT%%.*} - ${STARTED%%.*}))")
     echo "[$elapsed sec] $*" >> "$LOG"
 }
 
