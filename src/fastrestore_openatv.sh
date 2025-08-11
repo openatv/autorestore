@@ -447,7 +447,7 @@ log ""
 
 get_restoremode
 
-if [ "$SLOW" -eq 1 ]; then
+if [ "$slow" -eq 1 ]; then
     get_backupset
     log "Slowrestore:get_backupset done, backuplocation:$backuplocation " 
     # Exit if there is no backup set
