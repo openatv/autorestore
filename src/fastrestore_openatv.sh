@@ -429,12 +429,32 @@ restart_services() {
 	if [ -e /etc/ld.so.conf ] ; then
 		/sbin/ldconfig
 	fi
-	mounts=$(mount | grep -E '(^/dev/s|\b\cifs\b|\bnfs\b|\bnfs4\b)' | awk '{ print $1 }')
 
-	for i in $mounts; do
-		log "Unmounting $i ..." 
-		umount $i 2>&1 | while IFS= read -r line; do log "$line"; done
+	mounts=$(mount | awk '/^\/dev\/s|cifs|nfs/ {print $1 " " $3}')
+
+	# Root Device
+	rootdev=$(mount | grep ' on / ' | awk '{print $1}')
+
+	for entry in $mounts; do
+		dev=$(echo "$entry" | cut -d' ' -f1)
+		mp=$(echo "$entry" | cut -d' ' -f2)
+
+		# Skip root device
+		if [ "$dev" = "$rootdev" ]; then
+			continue
+		fi
+
+		# Skip system Mountpoints
+		case "$mp" in
+			/|/proc|/sys|/dev|/dev/pts|/run|/tmp)
+				continue
+				;;
+		esac
+
+		log "Unmounting $dev on $mp ..."
+		umount $dev 2>&1 | while IFS= read -r line; do log "$line"; done
 	done
+
 	[ -e "${ROOTFS}etc/init.d/volatile-media.sh" ] && ${ROOTFS}etc/init.d/volatile-media.sh
 	log "" 
 	log "Mounting all local filesystems ..." 
