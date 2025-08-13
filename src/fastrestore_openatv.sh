@@ -328,6 +328,59 @@ restart_network() {
 	total_wait=$((x+3))
 	log "Waited about $total_wait seconds for network reconnect."
 	log ""
+	# sync time and date
+	/etc/init.d/chronyd restart
+	log "Fastrestore: chronyd restart"
+	
+# --- Quick network health checks (DNS / Internet / SSL) ---
+	log ""
+	log "Quick network check:"
+
+	# DNS check (prefer nslookup; fallback: ping with hostname)
+	if command -v nslookup >/dev/null 2>&1; then
+		if nslookup google.com >/dev/null 2>&1; then
+			log "DNS: OK (google.com resolved successfully)"
+		else
+			log "DNS: FAIL (hostname resolution failed)"
+		fi
+	else
+		if ping -c 1 -W 1 google.com >/dev/null 2>&1; then
+			log "DNS: OK (via ping)"
+		else
+			log "DNS: FAIL (hostname resolution likely failed)"
+		fi
+	fi
+
+	# Internet check without DNS – IPv4 via known IPs
+	if ping -c 1 -W 1 1.1.1.1 >/dev/null 2>&1 || ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1; then
+		log "Internet (IPv4): OK"
+	else
+		log "Internet (IPv4): FAIL"
+	fi
+
+	# Optional: Internet IPv6 (only if ping6 is available)
+	if command -v ping6 >/dev/null 2>&1; then
+		if ping6 -c 1 -W 1 2606:4700:4700::1111 >/dev/null 2>&1; then
+			log "Internet (IPv6): OK"
+		else
+			log "Internet (IPv6): FAIL"
+		fi
+	fi
+
+	# SSL/TLS via HTTPS (use your feed as a real-world test; fallback: example.com)
+	if command -v wget >/dev/null 2>&1; then
+		if wget -q -T 5 -O /dev/null https://feeds2.mynonpublic.com/ >/dev/null 2>&1; then
+			log "SSL: OK (HTTPS connection to feeds2.mynonpublic.com)"
+		elif wget -q -T 5 -O /dev/null https://example.com >/dev/null 2>&1; then
+			log "SSL: OK (HTTPS general connection)"
+		else
+			log "SSL: FAIL (HTTPS request failed)"
+		fi
+	else
+		# wget not available; skipping SSL test
+		log "SSL: SKIPPED (wget not installed)"
+	fi
+	# --- End quick network check ---
 }
 
 
