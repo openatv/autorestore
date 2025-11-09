@@ -1,0 +1,18 @@
+# Sample configuration file for Fast Restore
+# All values are commented out to use the default settings
+
+# Window title (default: "Fast Restore in Progress")
+#title=Fast Restore in Progress
+
+# Window dimensions (default: width=800, height=200)
+#width=800
+#height=200
+
+# Background color (BGRA hex, default: #00000000)
+#bg_color=#00000000
+
+# Progress bar color (BGRA hex, default: #CCCCCCFF)
+#bar_color=#CCCCCCFF
+
+# Text color (BGRA hex, default: #FFFFFFFF)
+#text_color=#FFFFFFFF
