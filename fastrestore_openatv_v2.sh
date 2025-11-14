@@ -509,22 +509,29 @@ install_local_ipk_progress() {
     start="$1"; end="$2"
     found=0
     for i in hdd mmc usb backup; do
-        if ls "/media/${i}/images/ipk/"*.ipk >/dev/null 2>&1; then
-            found=1
-            progress_set "$start" "Installing local IPKs from $i..."
-            (
-                opkg install "/media/${i}/images/ipk/"*.ipk 2>&1 | while IFS= read -r line; do
-                    log "$line"
-                    progress_set "$start" "local ipk: $line"
-                done
-            ) &
-            pid=$!
-            progress_track_pid "$pid" "$start" "$end" "Local IPKs ($i)"
-            wait "$pid" 2>/dev/null || true
-        fi
+        for dir in \
+            "/media/${i}/images/ipk" \
+            "/media/${i}/plugins" \
+            "/media/${i}/images/plugins"
+        do
+            if ls "$dir/"*.ipk >/dev/null 2>&1; then
+                found=1
+                progress_set "$start" "Installing local IPKs from ${dir##/media/}..."
+                (
+                    opkg install "$dir/"*.ipk 2>&1 | while IFS= read -r line; do
+                        log "$line"
+                        progress_set "$start" "local ipk: $line"
+                    done
+                ) &
+                pid=$!
+                progress_track_pid "$pid" "$start" "$end" "Local IPKs (${dir##/media/})"
+                wait "$pid" 2>/dev/null || true
+            fi
+        done
     done
     [ "$found" -eq 0 ] && progress_set "$end" "No local IPKs found"
 }
+
 
 restart_services() {
     log ""
@@ -655,24 +662,30 @@ pct=$((pct+W_NET))
 (restart_services)
 pct=$(progress_phase_done "$pct" "$W_TURBO_PREP" "Services/Preparation")
 
-# 4) Plugins with detailed progress
+# 4) Plugin restore with extended debug (fast mode)
 if [ "$plugins" -eq 1 ] && [ -e "${ROOTFS}tmp/installed-list.txt" ]; then
+    log ""
+    log "====================[ FAST MODE: PLUGIN RESTORE START ]===================="
 
-    log "Starting plugin restore..."
+    # Read package list
     allpkgs="$(cat "${ROOTFS}tmp/installed-list.txt" 2>/dev/null || echo "")"
+    total_count=$(printf "%s\n" $allpkgs | wc -w)
+    log "Detected installed-list.txt: total entries = $total_count"
+    log "Raw package list:"
+    printf "%s\n" $allpkgs >> "$LOG"
 
     feeds_start="$pct"
     feeds_end=$((pct + 5))
     main_install_end=$((pct + W_PLUGINS_INSTALL))
 
-    # 1) First opkg update
+    log ">>> STEP 1: OPKG FEED UPDATE (${feeds_start}-${feeds_end})"
     progress_opkg_update "$feeds_start" "$feeds_end"
 
-    # 2) Local IPKs first
+    log ">>> STEP 2: LOCAL IPK INSTALL (${feeds_end}-$((feeds_end + 5)))"
     local_end=$((feeds_end + 5))
     install_local_ipk_progress "$feeds_end" "$local_end"
 
-    # Split packages
+    # Split feed-meta packages and normal plugin packages
     feedmeta=""
     pkgs=""
     for p in $allpkgs; do
@@ -681,40 +694,69 @@ if [ "$plugins" -eq 1 ] && [ -e "${ROOTFS}tmp/installed-list.txt" ]; then
             *)        pkgs="$pkgs $p" ;;
         esac
     done
+    log "Feed-meta packages: ${feedmeta:-<none>}"
+    log "Plugin packages (pre-filter): ${pkgs:-<none>}"
 
-    # 3) Install feed meta packages
+    # Install feed meta packages
     meta_end=$((local_end + 5))
     if [ -n "$feedmeta" ]; then
+        log ">>> STEP 3: INSTALL FEED META (${local_end}-${meta_end})"
         progress_opkg_packages install "$local_end" "$meta_end" $feedmeta
     else
         progress_set "$meta_end" "No feed meta packages found"
+        log "No feed meta packages found."
     fi
 
-    # 4) Second feed update
+    # Refresh feeds again
     refresh_end=$((meta_end + 3))
+    log ">>> STEP 4: SECOND OPKG FEED UPDATE (${meta_end}-${refresh_end})"
     progress_opkg_update "$meta_end" "$refresh_end"
 
-    # 5) Filter blacklisted pkgs (fixed)
+    # Blacklist filtering
     if [ -f /usr/lib/package.lst ]; then
         blacklist="$(awk '{print $1}' /usr/lib/package.lst)"
+        log "Blacklist entries:"
+        printf "%s\n" "$blacklist" >> "$LOG"
         pkgs_filtered=""
         for pkg in $pkgs; do
-            echo "$blacklist" | grep -qx "$pkg" \
-                && log "Skipping blacklisted: $pkg" \
-                || pkgs_filtered="$pkgs_filtered $pkg"
+            if printf '%s\n' "$blacklist" | grep -qx -- "$pkg"; then
+                log "Skipping blacklisted package: $pkg"
+            else
+                pkgs_filtered="$pkgs_filtered $pkg"
+            fi
         done
         pkgs="$(printf "%s" "$pkgs_filtered" | sed 's/^ *//;s/  */ /g')"
     fi
+    log "Plugin packages after blacklist filtering: ${pkgs:-<empty>}"
 
-    # 6) Install plugin packages
+    # Reduce to missing packages only
     if [ -n "$pkgs" ]; then
+        pkgs_missing=""
+        for pkg in $pkgs; do
+            if opkg status "$pkg" 2>/dev/null | grep -q '^Status:.*install ok installed'; then
+                log "Already installed: $pkg"
+            else
+                pkgs_missing="$pkgs_missing $pkg"
+            fi
+        done
+        pkgs="$(printf "%s" "$pkgs_missing" | sed 's/^ *//;s/  */ /g')"
+    fi
+    log "Final plugin install list (missing only): ${pkgs:-<empty>}"
+
+    # Install remaining plugin packages
+    if [ -n "$pkgs" ]; then
+        log ">>> STEP 5: INSTALL PLUGINS (${refresh_end}-${main_install_end})"
         progress_opkg_packages install "$refresh_end" "$main_install_end" $pkgs
     else
         progress_set "$main_install_end" "No plugin packages to install"
+        log "No plugin packages to install."
     fi
 
     pct="$main_install_end"
+    log "====================[ FAST MODE: PLUGIN RESTORE END ]======================"
+    log ""
 fi
+
 
 
 # 5) Remove plugins (if any) with detailed progress
