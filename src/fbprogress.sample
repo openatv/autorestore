@@ -4,6 +4,11 @@
 # Window title (default: "Fast Restore in Progress")
 #title=Fast Restore in Progress
 
+# Window position (default: top=20, left=20, alignRight=0)
+#top=20
+#left=20
+#alignRight=0
+
 # Window dimensions (default: width=800, height=200)
 #width=800
 #height=200

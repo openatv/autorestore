@@ -43,6 +43,9 @@ struct config {
     char title[128];
     int width;
     int height;
+    int top;
+    int left;
+	bool alignRight;
     unsigned char bg_color[4];
     unsigned char bar_color[4];
     unsigned char text_color[4];
@@ -103,15 +106,19 @@ void parse_hex_color_bgra(const char *hex, unsigned char *bgra) {
 }
 
 void load_config(const char *path) {
-    FILE *f = fopen(path, "r");
+	memset(&cfg, 0, sizeof(cfg));
+	strcpy(cfg.title, "Fast Restore in Progress");
+	cfg.width = 800;
+	cfg.height = 200;
+	cfg.top = 20;
+	cfg.left = 20;
+	cfg.alignRight = false;
+	parse_hex_color_bgra("#00000000", cfg.bg_color);
+	parse_hex_color_bgra("#CCCCCCFF", cfg.bar_color);
+	parse_hex_color_bgra("#FFFFFFFF", cfg.text_color);	
+
+	FILE *f = fopen(path, "r");
     if (!f) {
-		memset(&cfg, 0, sizeof(cfg));
-		strcpy(cfg.title, "Fast Restore in Progress");
-		cfg.width = 800;
-		cfg.height = 200;
-		parse_hex_color_bgra("#00000000", cfg.bg_color);
-		parse_hex_color_bgra("#CCCCCCFF", cfg.bar_color);
-		parse_hex_color_bgra("#FFFFFFFF", cfg.text_color);	
 		return;
     }
 
@@ -124,10 +131,16 @@ void load_config(const char *path) {
         if (sscanf(line, "%63[^=]=%127[^\n]", key, value) == 2) {
             if (strcmp(key, "title") == 0)
                 strncpy(cfg.title, value, sizeof(cfg.title));
+            else if (strcmp(key, "top") == 0)
+                cfg.top = atoi(value);
+            else if (strcmp(key, "left") == 0)
+                cfg.left = atoi(value);
             else if (strcmp(key, "width") == 0)
                 cfg.width = atoi(value);
             else if (strcmp(key, "height") == 0)
                 cfg.height = atoi(value);
+            else if (strcmp(key, "alignRight") == 0)
+                cfg.alignRight = atoi(value) > 0;
             else if (strcmp(key, "bg_color") == 0)
 				parse_hex_color_bgra(value, cfg.bg_color);
 			else if (strcmp(key, "bar_color") == 0)
@@ -166,14 +179,14 @@ void disableManualBlit()
 		g_manual_blit = 0;
 }
 
-void set_window_dimension(int width, int height)
+void set_window_dimension(int top, int left, int width, int height, bool alignRight)
 {
 	g_window.width = width;
 	g_window.height = height;
-	g_window.x1 = g_screeninfo_var.xres - g_window.width;
-	g_window.y1 = 0;
-	g_window.x2 = g_screeninfo_var.xres;
-	g_window.y2 = g_window.height;
+	g_window.x1 = (alignRight) ? g_screeninfo_var.xres - g_window.width : left;
+	g_window.y1 = top;
+	g_window.x2 = (alignRight) ? g_screeninfo_var.xres : left + width;
+	g_window.y2 = top + g_window.height;
 }
 
 void paint_box(int x1, int y1, int x2, int y2, char* color)
@@ -546,7 +559,7 @@ int init_framebuffer(int steps)
 		return 0;
 	}
 
-	set_window_dimension(cfg.width, cfg.height);
+	set_window_dimension(cfg.top, cfg.left, cfg.width, cfg.height, cfg.alignRight);
 
 	// hide all old osd content
 	paint_box(0, 0, g_screeninfo_var.xres, g_screeninfo_var.yres, TRANS);
