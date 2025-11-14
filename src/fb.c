@@ -391,6 +391,23 @@ void remove_substring(char* str, const char* to_remove) {
     }
 }
 
+void extract_final_part(char* str) {
+    const char *prefix = "opkg update: Downloading ";
+    char *pkg_pos = strstr(str, "/Packages.gz");
+    if (!pkg_pos) return;
+    *pkg_pos = '\0';
+    char *last_slash = strrchr(str, '/');
+    if (!last_slash) return;
+
+    char *name = last_slash + 1;
+    char *pref = strstr(str, prefix);
+    if (pref) {
+        strcpy(pref + strlen(prefix), name);
+    } else {
+        memmove(str, name, strlen(name) + 1);
+    }
+}
+
 void render_string_wrap(char* str, int x, int y, char* color, int thick, int max_width)
 {
 	int cur_x = x;
@@ -476,11 +493,12 @@ void set_step_text(char* str) // DONE
 	if (g_fbFd == -1)
 		return;
 
+	extract_final_part(str);
 	remove_substring(str, "enigma2-plugin-extensions-");
 	remove_substring(str, "enigma2-plugin-systemplugins-");
-	remove_substring(str,"https://raw.githubusercontent.com/oe-alliance/");
-	remove_substring(str,"https://feeds2.mynonpublic.com/");
-	remove_substring(str,"/Packages.gz");
+	//remove_substring(str,"https://raw.githubusercontent.com/oe-alliance/");
+	//remove_substring(str,"https://feeds2.mynonpublic.com/");
+	//remove_substring(str,"/Packages.gz");
 
 	// hide text
 	paint_box(g_window.x1 + 10

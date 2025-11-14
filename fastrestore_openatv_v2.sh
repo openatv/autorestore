@@ -278,24 +278,36 @@ progress_track_pid() {
 # Detailed opkg display --------------------------------------------------------
 progress_opkg_update() {
     start="$1"; end="$2"
-    [ -z "$start" ] && start=0; [ -z "$end" ] && end=$((start+10))
-    pct="$start"; progress_set "$pct" "opkg: Updating feeds..."
+    [ -z "$start" ] && start=0
+    [ -z "$end" ] && end=$((start+5))
+
+    pct="$start"
+    progress_set "$pct" "opkg: updating feeds..."
+
     (
         opkg update 2>&1 | while IFS= read -r line; do
             log "$line"
+            # Never update pct directly from opkg output → causes jumps
             progress_set "$pct" "opkg update: $line"
         done
     ) &
     upid=$!
+
+    # Safe progress tracking
+    step=$(( (end - start) / 30 ))
+    [ "$step" -lt 1 ] && step=1
+
     while kill -0 "$upid" 2>/dev/null; do
-        pct=$((pct+1))
-        [ "$pct" -ge "$((end-1))" ] && pct=$((start+((pct-start)/2)))
+        pct=$((pct + step))
+        [ "$pct" -ge "$((end-1))" ] && pct=$((start + (pct-start)/2))
         progress_set "$pct" "opkg update running..."
-        sleep 0.3
+        sleep 0.2
     done
+
     wait "$upid" 2>/dev/null || true
     progress_set "$end" "opkg update: done"
 }
+
 
 progress_opkg_packages() {
     mode="$1"; start="$2"; end="$3"; shift 3
@@ -516,37 +528,54 @@ install_local_ipk_progress() {
 
 restart_services() {
     log ""
-    log "Running in turbo mode ... remounting and restarting some services ..."
+    log "Turbo mode: remounting and restarting services..."
     log ""
+
+    set +e
 
     [ -x /sbin/swapoff ] && swapoff -a -e 2>/dev/null || true
     [ -e /etc/ld.so.conf ] && /sbin/ldconfig 2>/dev/null || true
 
     mounts="$(mount | awk '/^(\/dev\/s|cifs|nfs)/ {print $1 " " $3}')"
-    rootdev="$(mount | awk '$3=="/"{print $1;exit}')"
+    rootdev="$(mount | awk '$3=="/" {print $1; exit}')"
 
-    echo "$mounts" | while IFS= read -r line; do
+    # FIX: no subshell! while with input redirection = safe
+    while IFS= read -r line; do
         dev=$(printf "%s" "$line" | awk '{print $1}')
         mp=$(printf "%s" "$line" | awk '{print $2}')
         [ -z "$dev" ] || [ -z "$mp" ] && continue
         [ "$dev" = "$rootdev" ] && continue
-        case "$mp" in
-            /|/proc|/sys|/dev|/dev/pts|/run|/tmp) continue ;;
-        esac
-        log "Unmounting $dev on $mp ..."
-        umount "$mp" 2>&1 | while IFS= read -r l; do log "$l"; done || true
-    done
+        case "$mp" in /|/proc|/sys|/dev|/dev/pts|/run|/tmp) continue ;; esac
 
-    [ -x "${ROOTFS}etc/init.d/volatile-media.sh" ] && ${ROOTFS}etc/init.d/volatile-media.sh
-    log ""; log "Mounting all local filesystems ..."
-    mount -a -t nonfs,nfs4,smbfs,cifs,ncp,ncpfs,coda,ocfs2,gfs,gfs2,ceph -O no_netdev 2>&1 | while IFS= read -r l; do log "$l"; done
-    command -v udevadm >/dev/null 2>&1 && { udevadm trigger --action=add; udevadm settle; }
+        log "Unmounting $dev on $mp ..."
+        umount "$mp" 2>&1 | while IFS= read -r m; do log "$m"; done
+    done <<EOF
+$mounts
+EOF
+
+    [ -x "${ROOTFS}etc/init.d/volatile-media.sh" ] && \
+        ${ROOTFS}etc/init.d/volatile-media.sh
+
+    log "Mounting all local file systems..."
+    mount -a -t nonfs,nfs4,smbfs,cifs,ncp,ncpfs,coda,ocfs2,gfs,gfs2,ceph \
+        -O no_netdev 2>&1 | while IFS= read -r m; do log "$m"; done
+
+    command -v udevadm >/dev/null 2>&1 && {
+        udevadm trigger --action=add
+        udevadm settle
+    }
+
     [ -x /sbin/swapon ] && swapon -a 2>/dev/null || true
-    log ""; log "Backgrounding service restarts ..."
-    [ -x "${ROOTFS}etc/init.d/modutils.sh" ] && ${ROOTFS}etc/init.d/modutils.sh >/dev/null 2>&1 || true
-    [ -x "${ROOTFS}etc/init.d/modload.sh" ]  && ${ROOTFS}etc/init.d/modload.sh  >/dev/null 2>&1 || true
+
+    log "Restarting modules in background..."
+    [ -x "${ROOTFS}etc/init.d/modutils.sh" ] && \
+        ${ROOTFS}etc/init.d/modutils.sh >/dev/null 2>&1
+    [ -x "${ROOTFS}etc/init.d/modload.sh" ] && \
+        ${ROOTFS}etc/init.d/modload.sh >/dev/null 2>&1
+
     log ""
 }
+
 
 get_restoremode
 
@@ -628,43 +657,65 @@ pct=$(progress_phase_done "$pct" "$W_TURBO_PREP" "Services/Preparation")
 
 # 4) Plugins with detailed progress
 if [ "$plugins" -eq 1 ] && [ -e "${ROOTFS}tmp/installed-list.txt" ]; then
+
+    log "Starting plugin restore..."
+    allpkgs="$(cat "${ROOTFS}tmp/installed-list.txt" 2>/dev/null || echo "")"
+
     feeds_start="$pct"
     feeds_end=$((pct + 5))
     main_install_end=$((pct + W_PLUGINS_INSTALL))
 
+    # 1) First opkg update
     progress_opkg_update "$feeds_start" "$feeds_end"
 
+    # 2) Local IPKs first
     local_end=$((feeds_end + 5))
     install_local_ipk_progress "$feeds_end" "$local_end"
 
-    allpkgs="$(cat "${ROOTFS}tmp/installed-list.txt" 2>/dev/null || echo "")"
-    feedmeta=""; pkgs=""
+    # Split packages
+    feedmeta=""
+    pkgs=""
     for p in $allpkgs; do
-        echo "$p" | grep -q -- '-feed-' && feedmeta="$feedmeta $p" || pkgs="$pkgs $p"
+        case "$p" in
+            *-feed-*) feedmeta="$feedmeta $p" ;;
+            *)        pkgs="$pkgs $p" ;;
+        esac
     done
-    meta_end=$((local_end + 5))
-    [ -n "$feedmeta" ] && progress_opkg_packages install "$local_end" "$meta_end" $feedmeta || progress_set "$meta_end" "No feed meta packages"
 
+    # 3) Install feed meta packages
+    meta_end=$((local_end + 5))
+    if [ -n "$feedmeta" ]; then
+        progress_opkg_packages install "$local_end" "$meta_end" $feedmeta
+    else
+        progress_set "$meta_end" "No feed meta packages found"
+    fi
+
+    # 4) Second feed update
     refresh_end=$((meta_end + 3))
     progress_opkg_update "$meta_end" "$refresh_end"
 
+    # 5) Filter blacklisted pkgs (fixed)
     if [ -f /usr/lib/package.lst ]; then
         blacklist="$(awk '{print $1}' /usr/lib/package.lst)"
         pkgs_filtered=""
         for pkg in $pkgs; do
-            echo "$blacklist" | grep -qx "$pkg" && log "Skipping blacklisted package: $pkg" || pkgs_filtered="$pkgs_filtered $pkg"
+            echo "$blacklist" | grep -qx "$pkg" \
+                && log "Skipping blacklisted: $pkg" \
+                || pkgs_filtered="$pkgs_filtered $pkg"
         done
-        pkgs="$(echo "$pkgs_filtered" | sed 's/^ *//;s/  */ /g')"
+        pkgs="$(printf "%s" "$pkgs_filtered" | sed 's/^ *//;s/  */ /g')"
     fi
 
+    # 6) Install plugin packages
     if [ -n "$pkgs" ]; then
         progress_opkg_packages install "$refresh_end" "$main_install_end" $pkgs
     else
-        progress_set "$main_install_end" "No plugins to install"
+        progress_set "$main_install_end" "No plugin packages to install"
     fi
 
     pct="$main_install_end"
 fi
+
 
 # 5) Remove plugins (if any) with detailed progress
 if [ "$plugins" -eq 1 ] && [ -e "${ROOTFS}tmp/removed-list.txt" ]; then
