@@ -4,11 +4,9 @@
 ROOTFS=/
 LOG=/home/root/FastRestore.log
 
-# --- basic env ---
 umask 022
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 
-# --- log helper with uptime-based timestamp + simple rotation ---
 STARTED="$(cut -d. -f1 /proc/uptime 2>/dev/null || echo 0)"
 rotate_log() {
     [ -f "$LOG" ] || return 0
@@ -26,7 +24,6 @@ runlog() {
     "$@" 2>&1 | while IFS= read -r line; do log "$line"; done
 }
 
-# --- single-instance lock (requires busybox flock applet) ---
 LOCKFILE=/run/fastrestore.lock
 mkdir -p /run 2>/dev/null || true
 exec 9>"$LOCKFILE" 2>/dev/null
@@ -34,7 +31,6 @@ if command -v flock >/dev/null 2>&1; then
     flock -n 9 || { log "Another FastRestore instance is running. Exit."; exit 0; }
 fi
 
-# Kick chrony if available (helps with timestamps)
 if [ -x /etc/init.d/chronyd ]; then
     runlog /etc/init.d/chronyd restart
 else
@@ -45,7 +41,6 @@ log "Fastrestore: start"
 log "Fastrestore: check settings"
 [ -e /etc/enigma2/settings ] && exit 0
 
-# Choose python interpreter
 if command -v python3 >/dev/null 2>&1; then
     PY=python3
 elif command -v python >/dev/null 2>&1; then
@@ -63,7 +58,6 @@ do_panic() {
     exit 0
 }
 
-# Robust panic.update check
 for __p in /media/*/panic.update; do
     [ -e "$__p" ] && do_panic
 done
@@ -182,11 +176,9 @@ spinner() {
     done
 }
 
-# --- fbprogress integration with 78-char truncation ---------------------------
 FBP_BIN=/usr/bin/fbprogress
 FBP_PIPE=/tmp/fbprogress_pipe
 FBP_ON=0
-# Phase weights in percent (sum 100)
 W_SETTINGS=20
 W_NET=20
 W_TURBO_PREP=10
@@ -195,10 +187,7 @@ W_PLUGINS_REMOVE=5
 W_MYRESTORE=10
 W_FINISH=5
 
-# sanitize and truncate text to max 78 characters (single line)
 sanitize_and_trunc() {
-    # replace newlines with spaces, trim to 78 bytes
-    # Note: printf '%.78s' truncates safely for ASCII/UTF-8 byte count
     msg="$(printf '%s' "$*" | tr '\n' ' ')"
     printf '%.78s' "$msg"
 }
@@ -275,7 +264,6 @@ progress_track_pid() {
     progress_set "$end" "$label: done"
 }
 
-# Detailed opkg display --------------------------------------------------------
 progress_opkg_update() {
     start="$1"; end="$2"
     [ -z "$start" ] && start=0
@@ -287,13 +275,11 @@ progress_opkg_update() {
     (
         opkg update 2>&1 | while IFS= read -r line; do
             log "$line"
-            # Never update pct directly from opkg output → causes jumps
             progress_set "$pct" "opkg update: $line"
         done
     ) &
     upid=$!
 
-    # Safe progress tracking
     step=$(( (end - start) / 30 ))
     [ "$step" -lt 1 ] && step=1
 
@@ -504,7 +490,6 @@ restart_network() {
     fi
 }
 
-# FAST MODE helper: install local IPKs with progress
 install_local_ipk_progress() {
     start="$1"; end="$2"
     found=0
@@ -546,7 +531,6 @@ restart_services() {
     mounts="$(mount | awk '/^(\/dev\/s|cifs|nfs)/ {print $1 " " $3}')"
     rootdev="$(mount | awk '$3=="/" {print $1; exit}')"
 
-    # FIX: no subshell! while with input redirection = safe
     while IFS= read -r line; do
         dev=$(printf "%s" "$line" | awk '{print $1}')
         mp=$(printf "%s" "$line" | awk '{print $2}')
@@ -606,17 +590,19 @@ if [ "$slow" -eq 1 ]; then
 
     progress_opkg_update 5 20
 
+    install_local_ipk_progress 20 25
+
     install_list="$(cat "${ROOTFS}tmp/installed-list.txt" 2>/dev/null || echo "")"
     remove_list="$(cat "${ROOTFS}tmp/removed-list.txt" 2>/dev/null || echo "")"
 
     if [ -n "$remove_list" ]; then
-        progress_opkg_packages remove 20 30 $remove_list
+        progress_opkg_packages remove 25 35 $remove_list
     else
         progress_set 30 "No packages to remove"
     fi
 
     if [ -n "$install_list" ]; then
-        progress_opkg_packages install 30 98 $install_list
+        progress_opkg_packages install 35 98 $install_list
     else
         progress_set 98 "No packages to install"
     fi
@@ -647,34 +633,28 @@ progress_set "$pct" "Starting fast restore..."
 log "FastRestore is restoring settings ..."
 log ""; log ""
 
-# 1) Restore settings (foreground)
 restore_settings
 pct=$(progress_phase_done "$pct" "$W_SETTINGS" "Settings restored")
 
-# 2) Network (background + progress)
 (restart_network) &
 net_pid=$!
 progress_track_pid "$net_pid" "$pct" $((pct+W_NET)) "Network"
 wait "$net_pid" 2>/dev/null || true
 pct=$((pct+W_NET))
 
-# 3) Turbo prep/remount (foreground)
 (restart_services)
 pct=$(progress_phase_done "$pct" "$W_TURBO_PREP" "Services/Preparation")
 
-# 4) Plugin restore (v1 logic + fbprogress + full debug, fixed pkgs overwrite)
 if [ "$plugins" -eq 1 ] && [ -e "${ROOTFS}tmp/installed-list.txt" ]; then
     log ""
     log "====================[ FAST MODE: PLUGIN RESTORE ]===================="
 
-    # 1) installed-list laden
     allpkgs="$(cat "${ROOTFS}tmp/installed-list.txt" 2>/dev/null || echo "")"
     log "Original installed-list.txt content:"
     for a in $allpkgs; do
         log "  LIST: $a"
     done
 
-    # 2) feedmeta vs plugin_pkgs splitten
     feedmeta=""
     plugin_pkgs=""
     for p in $allpkgs; do
@@ -687,30 +667,30 @@ if [ "$plugins" -eq 1 ] && [ -e "${ROOTFS}tmp/installed-list.txt" ]; then
     log "Feedmeta packages: ${feedmeta:-<none>}"
     log "Normal packages (pre-filter): ${plugin_pkgs:-<none>}"
 
-    # 3) feedmeta installieren
     feeds_start="$pct"
     feeds_end=$((pct + 5))
 
     if [ -n "$feedmeta" ]; then
         log "Installing feedmeta packages..."
-        # Achtung: progress_opkg_packages überschreibt globale 'pkgs'
         progress_opkg_packages install "$feeds_start" "$feeds_end" $feedmeta
     else
         log "No feedmeta packages found."
         progress_set "$feeds_end" "No meta feeds"
     fi
 
-    # 4) opkg update nach feedmeta
     log "Running opkg update after feedmeta..."
     upd_start="$feeds_end"
     upd_end=$((upd_start + 5))
     progress_opkg_update "$upd_start" "$upd_end"
 
-    # *** WICHTIG: Pluginliste jetzt explizit aus plugin_pkgs setzen ***
+    local_start="$upd_end"
+    local_end=$((local_start + 5))
+    log "Installing local IPKs from media..."
+    install_local_ipk_progress "$local_start" "$local_end"
+
     pkgs="$plugin_pkgs"
     log "pkgs BEFORE any blacklist filter: ${pkgs:-<empty>}"
 
-    # 5) Filter A: /usr/lib/package.lst
     log "Filter A: removing packages that exist in /usr/lib/package.lst"
     if [ -f /usr/lib/package.lst ]; then
         pkglist_names="$(awk '{print $1}' /usr/lib/package.lst)"
@@ -731,7 +711,6 @@ if [ "$plugins" -eq 1 ] && [ -e "${ROOTFS}tmp/installed-list.txt" ]; then
         log "WARNING: /usr/lib/package.lst not found, skipping Filter A"
     fi
 
-    # 6) Filter B: manuelle Blacklist
     log "Filter B: applying manual blacklist"
     MANUAL_BL="
 bash-locale-*
@@ -766,8 +745,7 @@ tar-locale-*
     pkgs="$filtered2"
     log "pkgs AFTER manual blacklist: ${pkgs:-<empty>}"
 
-    # 7) Verbleibende Pakete installieren
-    install_start="$upd_end"
+    install_start="$local_end"
     install_end=$((install_start + W_PLUGINS_INSTALL))
 
     log "Final plugin install list: ${pkgs:-<empty>}"
@@ -784,10 +762,6 @@ tar-locale-*
     log ""
 fi
 
-
-
-
-# 5) Remove plugins (if any) with detailed progress
 if [ "$plugins" -eq 1 ] && [ -e "${ROOTFS}tmp/removed-list.txt" ]; then
     rem_end=$((pct + W_PLUGINS_REMOVE))
     remove_list="$(cat "${ROOTFS}tmp/removed-list.txt" 2>/dev/null || echo "")"
@@ -799,7 +773,6 @@ if [ "$plugins" -eq 1 ] && [ -e "${ROOTFS}tmp/removed-list.txt" ]; then
     pct="$rem_end"
 fi
 
-# 6) MyRestore hooks
 hooks=""
 for i in hdd mmc usb backup; do
     [ -e "/media/${i}/images/config/myrestore.sh" ] && hooks="$hooks $i"
@@ -821,7 +794,6 @@ if [ -n "$hooks" ]; then
     done
 fi
 
-# 7) Fast mode: reboot or finalize
 if [ "$turbo" -eq 0 ]; then
     progress_set 99 "Rebooting..."
     sync
