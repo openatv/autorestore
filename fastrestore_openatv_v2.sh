@@ -581,35 +581,7 @@ if [ "$slow" -eq 1 ]; then
     get_backupset
     log "Slowrestore: backuplocation:$backuplocation"
     [ ! -e "$backuplocation/enigma2settingsbackup.tar.gz" ] && exit 0
-
-    progress_start
-    progress_set 0 "Slow restore started..."
-
     restore_rctype_settings
-    progress_set 5 "Remote control type set"
-
-    progress_opkg_update 5 20
-
-    install_local_ipk_progress 20 25
-
-    install_list="$(cat "${ROOTFS}tmp/installed-list.txt" 2>/dev/null || echo "")"
-    remove_list="$(cat "${ROOTFS}tmp/removed-list.txt" 2>/dev/null || echo "")"
-
-    if [ -n "$remove_list" ]; then
-        progress_opkg_packages remove 25 35 $remove_list
-    else
-        progress_set 30 "No packages to remove"
-    fi
-
-    if [ -n "$install_list" ]; then
-        progress_opkg_packages install 35 98 $install_list
-    else
-        progress_set 98 "No packages to install"
-    fi
-
-    progress_set 99 "Finalizing..."
-    progress_end
-
     log "Slowrestore: done."
     exit 0
 fi
