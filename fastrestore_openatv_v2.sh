@@ -97,6 +97,11 @@ get_restoremode() {
         fast=0
     fi
 
+    if [ ! -e /usr/bin/ofgwrite ]; then
+        slow=1
+        fast=0
+    fi
+
     log "RestoreMode: final settings:$settings"
     log "RestoreMode: final noplugins:$noplugins"
     log "RestoreMode: final plugins:$plugins"
