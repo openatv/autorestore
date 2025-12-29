@@ -261,13 +261,17 @@ int get_screeninfo()
 // Needed by hisilicon boxes to show gui while e2 is running. screeninfo_var.yoffset is not 0 on these boxes
 int set_screeninfo()
 {
-	g_screeninfo_var.yres_virtual = g_screeninfo_var.yres * 2;
 	g_screeninfo_var.xoffset = g_screeninfo_var.yoffset = 0;
+	g_screeninfo_var.yres_virtual = g_screeninfo_var.yres * 3;
 
 	if (ioctl(g_fbFd, FBIOPUT_VSCREENINFO, &g_screeninfo_var) < 0)
 	{
-		perror("Cannot set variable information");
-		return 0;
+		g_screeninfo_var.yres_virtual = g_screeninfo_var.yres * 2;
+		if (ioctl(g_fbFd, FBIOPUT_VSCREENINFO, &g_screeninfo_var) < 0)
+		{
+			perror("Cannot set variable information");
+			return 0;
+		}
 	}
 
 	return 1;
