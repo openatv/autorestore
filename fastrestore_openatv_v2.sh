@@ -184,6 +184,7 @@ spinner() {
 FBP_BIN=/usr/bin/fbprogress
 FBP_PIPE=/tmp/fbprogress_pipe
 FBP_ON=0
+FBP_PID=
 W_SETTINGS=20
 W_NET=20
 W_TURBO_PREP=10
@@ -198,14 +199,21 @@ sanitize_and_trunc() {
 }
 
 fbp_safe_send() {
-    [ "$FBP_ON" -eq 1 ] && [ -p "$FBP_PIPE" ] && printf "%s\n" "$*" > "$FBP_PIPE"
+    [ "$FBP_ON" -eq 1 ] || return 0
+    if [ -n "$FBP_PID" ] && ! kill -0 "$FBP_PID" 2>/dev/null; then
+        FBP_PID=
+        FBP_ON=0
+        return 0
+    fi
+    [ -p "$FBP_PIPE" ] && printf "%s\n" "$*" > "$FBP_PIPE"
     return 0
 }
 
 progress_start() {
     if [ -x "$FBP_BIN" ]; then
-        [ -p "$FBP_PIPE" ] && echo QUIT > "$FBP_PIPE" 2>/dev/null || true
+        [ -p "$FBP_PIPE" ] && rm -f "$FBP_PIPE"
         "$FBP_BIN" &
+        FBP_PID=$!
         for _ in 1 2 3 4 5; do
             [ -p "$FBP_PIPE" ] && break
             sleep 0.05
@@ -218,6 +226,13 @@ progress_start() {
 }
 
 progress_end() {
+    [ "$FBP_ON" -eq 1 ] || return 0
+    if [ -n "$FBP_PID" ] && ! kill -0 "$FBP_PID" 2>/dev/null; then
+        FBP_PID=
+        FBP_ON=0
+        rm -f "$FBP_PIPE"
+        return 0
+    fi
     progress_set 100 "Done."
     if [ -p "$FBP_PIPE" ]; then
         i=0
@@ -227,6 +242,16 @@ progress_end() {
             sleep 0.5
         done
     fi
+    if [ -n "$FBP_PID" ]; then
+        i=0
+        while kill -0 "$FBP_PID" 2>/dev/null && [ $i -lt 20 ]; do
+            sleep 0.1
+            i=$((i+1))
+        done
+        wait "$FBP_PID" 2>/dev/null || true
+    fi
+    FBP_PID=
+    FBP_ON=0
 }
 
 progress_set() {

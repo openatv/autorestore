@@ -19,6 +19,7 @@
 
 int init_framebuffer(int steps);
 void close_framebuffer();
+void clear_framebuffer();
 int show_main_window();
 void set_step_progress(int percent);
 void set_step_text(char* str);
@@ -222,15 +223,27 @@ void paint_progressbar()
 			, cfg.bg_color);
 }
 
+void clear_framebuffer()
+{
+	if (g_fbFd < 0 || !g_lfb || !g_screeninfo_var.xres || !g_screeninfo_var.yres)
+		return;
+
+	paint_box(0, 0, g_screeninfo_var.xres, g_screeninfo_var.yres, TRANS);
+	blit();
+	if (g_screeninfo_fix.smem_len)
+		msync(g_lfb, g_screeninfo_fix.smem_len, MS_SYNC);
+}
+
 void close_framebuffer()
 {
-	// hide all old osd content
-	paint_box(0, 0, g_screeninfo_var.xres, g_screeninfo_var.yres, TRANS);
+	clear_framebuffer();
 
-	if (g_lfb)
+	if (g_lfb && g_lfb != MAP_FAILED)
 	{
-		msync(g_lfb, g_screeninfo_fix.smem_len, MS_SYNC);
+		if (g_screeninfo_fix.smem_len)
+			msync(g_lfb, g_screeninfo_fix.smem_len, MS_SYNC);
 		munmap(g_lfb, g_screeninfo_fix.smem_len);
+		g_lfb = NULL;
 	}
 
 	if (g_fbFd >= 0)
@@ -303,8 +316,9 @@ nolfb:
 int mmap_fb()
 {
 	g_lfb = (unsigned char*)mmap(0, g_screeninfo_fix.smem_len, PROT_WRITE|PROT_READ, MAP_SHARED, g_fbFd, 0);
-	if (!g_lfb)
+	if (g_lfb == MAP_FAILED)
 	{
+		g_lfb = NULL;
 		perror("mmap");
 		return 0;
 	}

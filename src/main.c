@@ -26,17 +26,47 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/select.h>
+#include <errno.h>
+#include <signal.h>
 #include "main.h"
 
 #define PIPE_PATH "/tmp/fbprogress_pipe"
 
+static volatile sig_atomic_t g_stop_requested = 0;
+
+static void handle_signal(int sig)
+{
+	(void)sig;
+	g_stop_requested = 1;
+}
+
+static void install_signal_handlers(void)
+{
+	struct sigaction action;
+
+	memset(&action, 0, sizeof(action));
+	action.sa_handler = handle_signal;
+	sigemptyset(&action.sa_mask);
+	sigaction(SIGTERM, &action, NULL);
+	sigaction(SIGINT, &action, NULL);
+	sigaction(SIGHUP, &action, NULL);
+}
+
 int main(int argc, char **argv) {
+	int fd = -1;
+	int exit_code = 0;
 
-	mkfifo(PIPE_PATH, 0666);
+	install_signal_handlers();
 
-    int fd = open(PIPE_PATH, O_RDONLY | O_NONBLOCK);
+	if (mkfifo(PIPE_PATH, 0666) < 0 && errno != EEXIST) {
+		perror("mkfifo");
+		return 1;
+	}
+
+    fd = open(PIPE_PATH, O_RDONLY | O_NONBLOCK);
     if (fd < 0) {
         perror("open");
+		unlink(PIPE_PATH);
         return 1;
     }
 
@@ -52,20 +82,26 @@ int main(int argc, char **argv) {
 
     load_config(cfg_path);
 
-	init_framebuffer(2);
+	if (!init_framebuffer(2)) {
+		exit_code = 1;
+		goto cleanup;
+	}
 	show_main_window();
 	set_step_text("Start....");
 
 	char buffer[256];
 
-    while (1) {
+    while (!g_stop_requested) {
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(fd, &readfds);
 
         int ret = select(fd + 1, &readfds, NULL, NULL, NULL);
         if (ret < 0) {
-//            perror("select");
+			if (errno == EINTR)
+				continue;
+			perror("select");
+			exit_code = 1;
             break;
         }
 
@@ -74,9 +110,11 @@ int main(int argc, char **argv) {
             if (n > 0) {
                 buffer[n] = '\0';
                 char *line = strtok(buffer, "\n");
-				if (strcmp(line, "QUIT") == 0)
-					break;
                 while (line) {
+					if (strcmp(line, "QUIT") == 0) {
+						g_stop_requested = 1;
+						break;
+					}
                     int percent;
                     char text[200];
                     printf("Received: %s\n", line);
@@ -90,6 +128,7 @@ int main(int argc, char **argv) {
                 close(fd);
                 fd = open(PIPE_PATH, O_RDONLY | O_NONBLOCK);
                 if (fd < 0) {
+					exit_code = 1;
 					break;
 //                    perror("open");
                 }
@@ -97,9 +136,11 @@ int main(int argc, char **argv) {
         }
     }
 
-    close(fd);
+cleanup:
+	if (fd >= 0)
+		close(fd);
 	unlink(PIPE_PATH);
 	close_framebuffer();
 
-	return 0;
+	return exit_code;
 }

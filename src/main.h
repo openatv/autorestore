@@ -6,6 +6,7 @@
 
 void load_config(const char *path);
 int init_framebuffer(int steps);
+void clear_framebuffer();
 void close_framebuffer();
 int show_main_window();
 void set_step_progress(int percent);
