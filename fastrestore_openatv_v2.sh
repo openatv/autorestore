@@ -117,18 +117,20 @@ get_backupset() {
     filename="enigma2settingsbackup.tar.gz"
     found_location=""
 
-    for folder in $media_folders; do
+    while IFS= read -r folder; do
+        [ -n "$folder" ] || continue
         log "Fastrestore: check backupset folder:$folder"
-        if [ -e "$folder/backup_${distro}_${machinebuild}/${filename}" ]; then
-            found_location="$folder/backup_${distro}_${machinebuild}"
-            log "Fastrestore: found_location:$found_location"
-            break
-        elif [ -e "$folder/backup_${distro}_${model}/${filename}" ]; then
-            found_location="$folder/backup_${distro}_${model}"
-            log "Fastrestore: found_location:$found_location"
-            break
-        fi
-    done
+        for location in "$folder/backup_${distro}_${machinebuild}" "$folder/backup_${distro}_${model}"; do
+            [ -f "$location/$filename" ] || continue
+            # Compare archive timestamps, not directory dates or device order.
+            if [ -z "$found_location" ] || [ "$location/$filename" -nt "$found_location/$filename" ]; then
+                found_location="$location"
+                log "Fastrestore: newest backupset:$found_location"
+            fi
+        done
+    done <<EOF
+$media_folders
+EOF
 
     if [ -z "$found_location" ]; then
         found_location="/media/hdd/backup_${distro}_${machinebuild}"
