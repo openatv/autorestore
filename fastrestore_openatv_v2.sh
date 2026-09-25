@@ -800,8 +800,28 @@ fi
 
 if [ "$turbo" -eq 0 ]; then
     progress_set 99 "Rebooting..."
+    progress_end
+    log "Fast mode done, reboot scheduled"
     sync
-    reboot
+    # We run as S75settings-restore, so init is still in sysinit and waits for
+    # rcS. Calling reboot here blocks until init changes runlevel, which it
+    # cannot do before rcS returns: init waits for rcS, rcS for us, we for
+    # reboot. Detach it and reboot once init left sysinit and rcS is done.
+    (
+        i=0
+        while [ $i -lt 120 ]; do
+            set -- $(runlevel 2>/dev/null)
+            case "$2" in
+                ""|S|unknown) ;;
+                *) break ;;
+            esac
+            i=$((i + 1))
+            sleep 1
+        done
+        sync
+        reboot
+    ) >/dev/null 2>&1 &
+    exit 0
 fi
 
 (restart_services) &
