@@ -20,8 +20,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
-#include <libgen.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -52,7 +50,7 @@ static void install_signal_handlers(void)
 	sigaction(SIGHUP, &action, NULL);
 }
 
-int main(int argc, char **argv) {
+int main(void) {
 	int fd = -1;
 	int exit_code = 0;
 
@@ -70,24 +68,11 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    char cfg_path[512];
-    char exe_path[512];
-    ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path)-1);
-    if (len != -1) {
-        exe_path[len] = '\0';
-        snprintf(cfg_path, sizeof(cfg_path), "%s/fbprogress.cfg", dirname(exe_path));
-    } else {
-        strcpy(cfg_path, "fbprogress.cfg"); // fallback
-    }
-
-    load_config(cfg_path);
-
-	if (!init_framebuffer(2)) {
+	if (!init_framebuffer()) {
 		exit_code = 1;
 		goto cleanup;
 	}
-	show_main_window();
-	set_step_text("Start....");
+	set_progress(0, "Starting", 0);
 
 	char buffer[256];
 
@@ -96,7 +81,9 @@ int main(int argc, char **argv) {
         FD_ZERO(&readfds);
         FD_SET(fd, &readfds);
 
-        int ret = select(fd + 1, &readfds, NULL, NULL, NULL);
+        struct timeval timeout = {0, 250000};  /* For the running time and texts held back by the redraw rate. */
+        int ret = select(fd + 1, &readfds, NULL, NULL, &timeout);
+        tick_framebuffer();
         if (ret < 0) {
 			if (errno == EINTR)
 				continue;
@@ -115,13 +102,17 @@ int main(int argc, char **argv) {
 						g_stop_requested = 1;
 						break;
 					}
+					if (strncmp(line, "SUB ", 4) == 0) {  /* "SUB 39", "SUB -" hides it. */
+						set_sub_progress(line[4] == '-' ? -1 : atoi(line + 4));
+						line = strtok(NULL, "\n");
+						continue;
+					}
                     int percent;
                     char text[200];
                     printf("Received: %s\n", line);
-                    if (sscanf(line, "%d %[^\n]", &percent, text) == 2) {
-                        set_step_text(text);
-                        set_step_progress(percent);
-                    }
+                    int failed = strncmp(line, "FAIL ", 5) == 0;  /* "FAIL 70 text": shown red for a moment. */
+                    if (sscanf(failed ? line + 5 : line, "%d %199[^\n]", &percent, text) == 2)
+                        set_progress(percent, text, failed);
                     line = strtok(NULL, "\n");
                 }
             } else if (n == 0) {
