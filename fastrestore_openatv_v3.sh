@@ -736,9 +736,10 @@ tar-locale-*
     if [ "$plugins" -eq 1 ] && [ -e "${ROOTFS}tmp/removed-list.txt" ]; then
         remove_list="$(cat "${ROOTFS}tmp/removed-list.txt" 2>/dev/null || echo "")"
     fi
+    # Only an estimate: restart_services remounts the media by the restored fstab, so the names may change.
     hooks=""
-    for i in hdd mmc usb backup; do
-        [ -e "/media/${i}/images/config/myrestore.sh" ] && hooks="$hooks $i"
+    for f in /media/*/images/config/myrestore.sh; do
+        [ -e "$f" ] && hooks="$hooks x"
     done
 }
 
@@ -843,6 +844,12 @@ if [ -n "$remove_list" ]; then
     pct="$PHASE_END"
 fi
 
+# After restart_services, the media are mounted by the restored fstab now.
+hooks=""
+for i in hdd mmc usb backup; do
+    [ -e "/media/${i}/images/config/myrestore.sh" ] && hooks="$hooks $i"
+done
+log "myrestore.sh found on: ${hooks:-<none>}"
 for i in $hooks; do
     next_phase "$T_MYRESTORE"
     (
